@@ -354,6 +354,7 @@ button:disabled {
 }
 
 .note {
+  white-space: pre-line;
   margin-top: 14px;
   padding-left: 12px;
   border-left: 3px solid var(--primary);
@@ -457,8 +458,3 @@ button:disabled {
   }
 }
 
-.model .alt-note {
-  font-family: inherit;
-  font-size: 0.8rem;
-  margin-top: 4px;
-}

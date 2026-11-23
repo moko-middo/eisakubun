@@ -1,15 +1,25 @@
-/** src/data/problems.ts に書く問題 */
-export interface ProblemSource {
+/** 1 問（ドリルの英文 1 文から作る） */
+export interface Problem {
   id: string
+  /** ドリルの名前（例: 11/17 のドリル） */
   tag: string
   ja: string
-  en: string
-  alt?: string[]
-  distractors?: string[]
+  /** 模範解答を語（または入力式のかたまり）に分けたもの */
+  tokens: Token[]
+  /** 解説（使った復習語彙） */
   note: string
 }
 
-/** 答えの 1 語（または `_` でつないだかたまり） */
+/** content/drills/ の MD 1 つ分 */
+export interface Drill {
+  name: string
+  label: string
+  problems: Problem[]
+  /** MD にあった英文の数（和訳のない文も含む） */
+  sentences: number
+}
+
+/** 答えの 1 語（または入力式の語のかたまり） */
 export interface Token {
   /** 表示用（句読点付き） */
   display: string

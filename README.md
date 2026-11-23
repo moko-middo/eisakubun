@@ -1,42 +1,40 @@
-# 英作文900 — TOEIC 900 レベルの英作文トレーニング
+# 英作文ドリル
 
-日本語の文を見て、英文を**組み立てて**答える英作文アプリです。話さずに、タップと入力だけで練習できます。
+センテンスリピートドリルの英文を、日本語を見ながら**組み立てて**答える英作文アプリです。話さずに、タップと入力だけで練習できます。
 
 公開先: https://moko-middo.github.io/eisakubun/
 
 ## 遊び方
 
-- 主語・前置詞などのやさしい語は**カードを並べ替え**
-- 難しい語（✎ のカード。日本語のヒント付き）は、置くと入力欄になるので**英単語を打ち込む**。時制や -ing などの形も自分で変える
-- ひっかけのダミーカードが混ざっている問題もある（例: 仮定法現在の `submit` と `submits`）
-- 「ヒント」で入力語の最初の文字と文字数を表示
-- 答え合わせで、合っている位置は緑・違う位置は赤。綴りの間違い、模範解答（🔊 で読み上げ）、文法の解説を表示
-- 間違えた問題だけを復習できる。記録タブで文法項目ごとの進み具合を確認
+- 日本語の文を見て、英文を組み立てる
+- その日の**復習語彙**（✎ のカード。日本語のヒント付き）は、置くと入力欄になるので**英語を打ち込む**。活用（having / developed など）も自分で変える
+- それ以外の語は**カードを並べ替え**
+- 「ヒント」で入力語の各単語の最初の文字と文字数を表示
+- 答え合わせで、合っている位置は緑・違う位置は赤。綴りの間違い、模範解答（🔊 で読み上げ）、使った語彙を表示
+- ドリルを日付ごとに選べる（最初は一番新しいドリル）。間違えた問題だけの復習も
 
 記録はブラウザ内（localStorage）だけに保存されます。
 
-## 問題
+## ドリルの追加
 
-`src/data/problems.ts` に 45 問。文法項目は、仮定法・倒置、仮定法現在、分詞構文・分詞、関係詞・名詞節、使役・語法、接続詞・前置詞、時制、比較、受動態・不定詞・動名詞。
+`content/drills/` に MD ファイルを置いて `main` に push すると、自動でサイトが更新されます。
+ファイル名は日付（`2026-11-17.md`、同じ日に 2 つ目なら `2026-11-17_2.md`）。
 
-問題の書き方:
+```
+本日の復習語彙
 
-```ts
-{
-  id: 'should-inversion',
-  tag: '仮定法・倒置',
-  ja: '払い戻しの手続きについてご質問がございましたら、経理部までご連絡ください。',
-  en: 'Should you have any questions about the {reimbursement|払い戻し} process, please contact the {accounting|経理} department.',
-  alt: ['please contact the accounting department should you have any questions about the reimbursement process'],
-  distractors: ['would'],
-  note: '「Should + 主語 + 動詞の原形」は If you should have ... の倒置。',
-}
+* booking reference（予約番号・予約照会番号）
+* have someone round（人を家に招く（英））
+
+1. Please quote your booking reference when you phone the helpline.
+   ヘルプラインにお電話の際は、予約番号をお伝えください。
+2. We're having the neighbours round for supper on Friday evening.
+   金曜の夜、近所の人たちを夕食に招きます。
 ```
 
-- `en` はスペース区切りの 1 語が 1 枚のカード。`as_soon_as` のように `_` でつなぐと 1 枚にまとまる
-- `{単語|ヒント}` が入力式。複数の綴りを認めるときは `{fulfill/fulfil|履行する}`
-- `alt` はほかにも正しい語順（小文字・句読点なし）
-- `distractors` はダミーのカード。**正しい英文が作れてしまう語は入れない**
+- `* 語（日本語）` の行が復習語彙。英文の中のその語が入力式になる（`someone` / `something` などは別の語に置き換わってもよい）
+- `番号. 英文` の**次の行**が和訳。和訳のない文は問題にならない
+- そのほかの行（タイトル、音声のファイル名など）は無視
 
 ## 開発
 
@@ -45,7 +43,3 @@ npm install
 npm run dev
 npm run build
 ```
-
-## 公開
-
-`main` に push すると GitHub Actions がビルドして GitHub Pages に公開します（初回のみ、リポジトリの **Settings → Pages → Source** を **GitHub Actions** にしてください）。

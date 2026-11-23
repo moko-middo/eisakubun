@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ProblemSource } from '../types'
-import { grade, normalize, prepare, type Grade } from '../lib/problem'
+import type { Problem } from '../types'
+import { grade, hintFor, normalize, prepare, type Grade } from '../lib/problem'
 
 interface Props {
-  problem: ProblemSource
+  problem: Problem
   position: string
   onAnswered: (correct: boolean) => void
   onNext: () => void
@@ -51,7 +51,7 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
   const check = () => {
     if (!canCheck || result) return
     const words = placed.map((id) => (cards[id].typed ? typed[id] : cards[id].label))
-    const g = grade(tokens, words, problem.alt)
+    const g = grade(tokens, words)
     setResult(g)
     onAnswered(g.correct)
     speak(answerText)
@@ -114,7 +114,7 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
                 }}
                 value={value}
                 readOnly={!!result}
-                placeholder={hint && exp ? `${exp.accepts[0][0]}${'·'.repeat(exp.accepts[0].length - 1)}` : c.label}
+                placeholder={hint && exp ? hintFor(exp.accepts[0]) : c.label}
                 size={Math.max(6, value.length + 1, (hint && exp ? exp.accepts[0].length : c.label.length * 2) + 1)}
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -166,7 +166,7 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
               答え合わせ
             </button>
           </div>
-          {hint && <p className="muted small">入力欄に最初の文字と文字数を表示しました。</p>}
+          {hint && <p className="muted small">入力欄に、各単語の最初の文字と文字数を表示しました。</p>}
         </>
       )}
 
@@ -186,7 +186,6 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
                 🔊
               </button>
             </p>
-            {problem.alt && !result.correct && <p className="alt-note muted">ほかの語順でも正解になる場合があります。</p>}
           </div>
           {wrongTyped.length > 0 && (
             <ul className="spelling">
@@ -198,7 +197,7 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
               ))}
             </ul>
           )}
-          <p className="note">{problem.note}</p>
+          {problem.note && <p className="note">{problem.note}</p>}
           <button className="primary-btn next" onClick={onNext}>
             次へ
           </button>

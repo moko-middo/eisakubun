@@ -1,6 +1,4 @@
-import type { Card, ProblemSource, Token } from '../types'
-
-const TOKEN_RE = /^(?:\{([^|}]+)\|([^}]+)\}|([^\s{]+?))([.,;:?!]*)$/
+import type { Card, Problem, Token } from '../types'
 
 export const normalize = (s: string) =>
   s
@@ -9,20 +7,6 @@ export const normalize = (s: string) =>
     .replace(/[.,;:?!"]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-
-export function parseTokens(en: string): Token[] {
-  return en.split(' ').map((raw) => {
-    const m = raw.match(TOKEN_RE)
-    if (!m) throw new Error(`問題文の書式が正しくありません: ${raw}`)
-    const [, typedWords, gloss, word, punct] = m
-    if (typedWords) {
-      const accepts = typedWords.split('/').map(normalize)
-      return { display: typedWords.split('/')[0] + punct, accepts, gloss }
-    }
-    const text = word.replace(/_/g, ' ')
-    return { display: text + punct, accepts: [normalize(text)] }
-  })
-}
 
 /** 文頭の大文字は答えのヒントになるので、カードでは小文字にする（I は除く） */
 function cardLabel(display: string, first: boolean) {
@@ -39,13 +23,10 @@ export function shuffle<T>(xs: T[]): T[] {
   return a
 }
 
-export function makeCards(tokens: Token[], distractors: string[] = []): Card[] {
-  const cards: Omit<Card, 'id'>[] = [
-    ...tokens.map((t, i) =>
-      t.gloss ? { label: t.gloss, typed: true } : { label: cardLabel(t.display, i === 0), typed: false },
-    ),
-    ...distractors.map((d) => ({ label: d, typed: false })),
-  ]
+export function makeCards(tokens: Token[]): Card[] {
+  const cards: Omit<Card, 'id'>[] = tokens.map((t, i) =>
+    t.gloss ? { label: t.gloss, typed: true } : { label: cardLabel(t.display, i === 0), typed: false },
+  )
   // 正解の順に並んでしまったら混ぜ直す
   let order = shuffle(cards.map((_, i) => i))
   while (cards.length > 2 && order.every((v, i) => v === i)) order = shuffle(order)
@@ -59,16 +40,20 @@ export interface Grade {
 }
 
 /** answer: 並べた順の語（入力式は入力した文字） */
-export function grade(tokens: Token[], answer: string[], alt: string[] = []): Grade {
+export function grade(tokens: Token[], answer: string[]): Grade {
   const got = answer.map(normalize)
+  // 同じ語のカードが 2 枚あるときなどは、置いた語の並びが模範解答と同じなら正解
+  const correct = got.join(' ') === tokens.map((t) => t.accepts[0]).join(' ') ||
+    (got.length === tokens.length && got.every((w, i) => tokens[i].accepts.includes(w)))
   const positions = got.map((w, i) => tokens[i]?.accepts.includes(w) ?? false)
-  const matchesMain = got.length === tokens.length && positions.every(Boolean)
-  const sentence = got.join(' ')
-  const matchesAlt = alt.some((a) => normalize(a) === sentence)
-  return matchesAlt ? { correct: true, positions: got.map(() => true) } : { correct: matchesMain, positions }
+  return { correct, positions: correct ? got.map(() => true) : positions }
 }
 
-export function prepare(p: ProblemSource) {
-  const tokens = parseTokens(p.en)
-  return { tokens, cards: makeCards(tokens, p.distractors) }
+export function prepare(p: Problem) {
+  return { tokens: p.tokens, cards: makeCards(p.tokens) }
+}
+
+/** ヒント: 各語の最初の文字だけ見せる（例: booking reference → b······ r········） */
+export function hintFor(answer: string) {
+  return answer.replace(/\S+/g, (w) => w[0] + '·'.repeat(w.length - 1))
 }

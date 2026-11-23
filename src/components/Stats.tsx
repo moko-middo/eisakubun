@@ -1,7 +1,7 @@
-import type { AnswerLog, ProblemSource } from '../types'
+import type { AnswerLog, Problem } from '../types'
 
 interface Props {
-  problems: ProblemSource[]
+  problems: Problem[]
   logs: AnswerLog[]
   onReset: () => void
 }
@@ -45,7 +45,7 @@ export function Stats({ problems, logs, onReset }: Props) {
         </div>
       </div>
 
-      <h3 className="section-title">文法項目ごと</h3>
+      <h3 className="section-title">ドリルごと</h3>
       <ul className="tag-stats">
         {byTag.map((t) => (
           <li key={t.tag}>
