@@ -124,31 +124,46 @@ function drillLabel(name: string) {
 /**
  * センテンスリピートドリルの MD を問題にする。
  * - 「* 語（日本語）」の行が復習語彙。文中のその語を入力式にする
- * - 「1. 英文」の次の行の日本語がその文の和訳。和訳のない文は問題にしない
+ * - 和訳は次のどちらか。和訳のない文は問題にしない
+ *   - 別のセクションに「1. 日本語」と同じ番号で書く
+ *   - 「1. 英文」のすぐ次の行に書く
  */
 export function parseDrill(name: string, md: string): Drill {
   const lines = md.replace(/^﻿/, '').split(/\r?\n/)
   const vocab: Vocab[] = []
   const sentences: { n: number; en: string; ja?: string }[] = []
+  const jaByNumber = new Map<number, string>()
+  let afterEnglish = false
   for (const raw of lines) {
-    const line = raw.trim()
+    // 全角数字（１．）も番号として読む
+    const line = raw.trim().replace(/[０-９]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0xfee0))
     if (!line) continue
+    const wasAfterEnglish = afterEnglish
+    afterEnglish = false
+    if (line.startsWith('#')) continue // 見出し
     const item = line.match(/^[*\-•]\s+(.+)$/)
     if (item) {
       const v = parseVocab(item[1])
       if (v) vocab.push(v)
       continue
     }
-    const numbered = line.match(/^(\d+)[.)．]\s+(.+)$/)
-    if (numbered && !JAPANESE.test(numbered[2])) {
-      sentences.push({ n: Number(numbered[1]), en: numbered[2].trim() })
+    const numbered = line.match(/^(\d+)[.)．、]\s*(.+)$/)
+    if (numbered) {
+      const n = Number(numbered[1])
+      const text = numbered[2].trim()
+      if (JAPANESE.test(text)) jaByNumber.set(n, text)
+      else {
+        sentences.push({ n, en: text })
+        afterEnglish = true
+      }
       continue
     }
     const last = sentences[sentences.length - 1]
-    if (last && !last.ja && JAPANESE.test(line) && !numbered) {
+    if (wasAfterEnglish && JAPANESE.test(line)) {
       last.ja = line.replace(/^(?:訳|和訳)\s*[:：]\s*/, '')
     }
   }
+  for (const s of sentences) s.ja = jaByNumber.get(s.n) ?? s.ja
 
   const label = drillLabel(name)
   // 長い語彙から先に当てる（hard water と water のような重なりを長いほうに）
