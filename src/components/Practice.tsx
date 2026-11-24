@@ -13,15 +13,30 @@ interface Props {
   newBest: boolean
 }
 
-/** 正解したとき、次の問題へ自動で進むまでの時間 */
-const AUTO_NEXT_MS = 1800
+/** 正解したとき、読み上げが終わってから次の問題へ自動で進むまでの時間 */
+const AUTO_NEXT_MS = 1200
 
-function speak(text: string) {
-  if (!('speechSynthesis' in window)) return
+/** 英文を読み上げる。終わったら（読み上げできない環境ではすぐに）onEnd を呼ぶ */
+function speak(text: string, onEnd?: () => void) {
+  if (!('speechSynthesis' in window)) {
+    onEnd?.()
+    return
+  }
   speechSynthesis.cancel()
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'en-US'
   u.rate = 0.95
+  if (onEnd) {
+    let called = false
+    const end = () => {
+      if (!called) onEnd()
+      called = true
+    }
+    u.onend = end
+    u.onerror = end
+    // 端末によっては終わりの合図が来ないことがあるので、文の長さから見積もった時間で打ち切る
+    window.setTimeout(end, 2500 + text.split(' ').length * 550)
+  }
   speechSynthesis.speak(u)
 }
 
@@ -33,6 +48,8 @@ export function Practice({ problem, position, onAnswered, onNext, combo, newBest
   const [result, setResult] = useState<Grade | null>(null)
   // 正解のあと自動で次へ進むか（読み上げを聞き直したいときなどは止める）
   const [autoNext, setAutoNext] = useState(true)
+  // 答え合わせのあとの読み上げが終わったか
+  const [spoken, setSpoken] = useState(false)
   const inputs = useRef(new Map<number, HTMLInputElement>())
   const justPlaced = useRef<number | null>(null)
 
@@ -63,14 +80,14 @@ export function Practice({ problem, position, onAnswered, onNext, combo, newBest
     const g = grade(tokens, words)
     setResult(g)
     onAnswered(g.correct)
-    speak(answerText)
+    speak(answerText, () => setSpoken(true))
   }
 
   useEffect(() => {
-    if (!result?.correct || !autoNext) return
+    if (!result?.correct || !autoNext || !spoken) return
     const timer = window.setTimeout(onNext, AUTO_NEXT_MS)
     return () => window.clearTimeout(timer)
-  }, [result, autoNext, onNext])
+  }, [result, autoNext, spoken, onNext])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -231,7 +248,7 @@ export function Practice({ problem, position, onAnswered, onNext, combo, newBest
           )}
           {problem.note && <p className="note">{problem.note}</p>}
           <button
-            className={`primary-btn next${result.correct && autoNext ? ' auto' : ''}`}
+            className={`primary-btn next${result.correct && autoNext && spoken ? ' auto' : ''}`}
             style={{ ['--auto-ms' as string]: `${AUTO_NEXT_MS}ms` }}
             onClick={onNext}
           >
