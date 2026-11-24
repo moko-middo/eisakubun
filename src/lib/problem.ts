@@ -64,6 +64,8 @@ const MOVABLE = new Set(
 const CLAUSE = new Set(
   'and but or so if when while because that until before after unless although though which who where whether than then'.split(' '),
 )
+/** 文と文をつなぐ語。文頭の語句は、この前（前半の文の終わり）に移してもよい */
+const JOIN = new Set(['and', 'but', 'so', 'or'])
 /** 直後の語句と結びついている語（almost every morning など） */
 const BOUND = new Set('almost nearly only just about around roughly even'.split(' '))
 
@@ -72,7 +74,7 @@ const words = (ts: Token[]) => ts.flatMap((t) => normalize(t.prefix ? `${t.prefi
 
 /**
  * 模範解答のほかに正解にする語順。
- * - 文頭の「Every Bonfire Night,」のような語句を文末に回したもの
+ * - 文頭の「On Boxing Day,」のような語句を文末、または and / but の前に回したもの
  * - 文末の「at the Christmas market」のような短い語句（5 語まで）を文頭に出したもの。
  *   ただし、節が 1 つだけの文に限る（2 つ以上あると、どこに掛かる語句か変わってしまうため）
  */
@@ -82,7 +84,13 @@ function otherOrders(tokens: Token[]): Token[][] {
   if (MOVABLE.has(firstWord(tokens[0]))) {
     for (let k = 1; k <= Math.min(6, n - 2); k++) {
       if (/,$/.test(tokens[k - 1].display)) {
-        out.push([...tokens.slice(k), ...tokens.slice(0, k)])
+        const phrase = tokens.slice(0, k)
+        const rest = tokens.slice(k)
+        out.push([...rest, ...phrase])
+        // 「…, and then …」の前（前半の文の終わり）に入れてもよい
+        rest.forEach((t, j) => {
+          if (j > 0 && JOIN.has(firstWord(t))) out.push([...rest.slice(0, j), ...phrase, ...rest.slice(j)])
+        })
         break
       }
     }
