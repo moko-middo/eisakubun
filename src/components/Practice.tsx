@@ -150,7 +150,7 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
               </button>
             ))}
           </div>
-          <p className="muted small legend">✎ のカードは英単語を入力します</p>
+          {cards.some((c) => c.typed) && <p className="muted small legend">✎ のカードは英単語を入力します</p>}
           <div className="actions">
             <button className="sub-btn" onClick={() => setHint(true)} disabled={hint}>
               ヒント

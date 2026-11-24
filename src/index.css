@@ -469,3 +469,20 @@ button:disabled {
 .chip.typed-card .prefix {
   color: var(--primary);
 }
+
+.review-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--ng);
+  color: var(--ng);
+  background: var(--ng-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.review-note {
+  margin-top: 6px;
+}
