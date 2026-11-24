@@ -1,4 +1,5 @@
 import type { AnswerLog, Problem } from '../types'
+import { Weakness } from './Weakness'
 
 interface Props {
   problems: Problem[]
@@ -44,6 +45,9 @@ export function Stats({ problems, logs, onReset }: Props) {
           </strong>
         </div>
       </div>
+
+      <h3 className="section-title">苦手分析</h3>
+      <Weakness problems={problems} logs={logs} />
 
       <h3 className="section-title">ドリルごと</h3>
       <ul className="tag-stats">

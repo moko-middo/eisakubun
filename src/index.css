@@ -342,17 +342,6 @@ button:disabled {
   font-size: 1rem;
 }
 
-.spelling {
-  list-style: none;
-  margin-top: 10px;
-  font-family: Georgia, serif;
-}
-
-.spelling .got {
-  color: var(--ng);
-  text-decoration: line-through;
-}
-
 .note {
   white-space: pre-line;
   margin-top: 14px;
@@ -485,4 +474,143 @@ button:disabled {
 
 .review-note {
   margin-top: 6px;
+}
+
+/* ── 間違いの分析 ── */
+
+.analysis {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--ng-soft);
+}
+
+.analysis-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.analysis ul,
+.tips,
+.word-list,
+.kind-bars {
+  list-style: none;
+}
+
+.analysis li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 4px 0;
+  line-height: 1.6;
+}
+
+.tip {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.kind {
+  flex: none;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--surface);
+  background: var(--text-muted);
+}
+
+.kind-綴り {
+  background: #c2412d;
+}
+
+.kind-語形 {
+  background: #b5651d;
+}
+
+.kind-別の語 {
+  background: #7a4fb0;
+}
+
+.kind-語順 {
+  background: #2f6f9e;
+}
+
+.kind-使い忘れ {
+  background: #6f6a60;
+}
+
+.copy {
+  margin-top: 12px;
+}
+
+.copy-btn {
+  font-size: 0.85rem;
+  padding: 8px 14px;
+}
+
+.copy .muted {
+  margin-top: 6px;
+}
+
+.copy-text {
+  width: 100%;
+  margin-top: 6px;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.weakness h4 {
+  font-size: 0.9rem;
+  margin: 16px 0 6px;
+}
+
+.kind-bars li {
+  display: grid;
+  grid-template-columns: 5em 1fr 2em;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.kind-bars .kind {
+  text-align: center;
+}
+
+.kind-bars .bar {
+  height: 8px;
+}
+
+.tips li {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  margin-bottom: 4px;
+}
+
+.word-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.word-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.word-list strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 600;
 }
