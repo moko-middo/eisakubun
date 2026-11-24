@@ -167,7 +167,7 @@ function drillLabel(name: string) {
 
 /**
  * センテンスリピートドリルの MD を問題にする。
- * - 「* 語（日本語）」の行が復習語彙。文中のその語を入力式にする
+ * - 「* 語（日本語）」の行、または「語彙」を含む見出しの下の「3. 語（日本語）」の行が語彙。文中のその語を入力式にする
  * - 和訳は次のどちらか。和訳のない文は問題にしない
  *   - 別のセクションに「1. 日本語」と同じ番号で書く
  *   - 「1. 英文」のすぐ次の行に書く
@@ -178,13 +178,27 @@ export function parseDrill(name: string, md: string): Drill {
   const sentences: { n: number; en: string; ja?: string }[] = []
   const jaByNumber = new Map<number, string>()
   let afterEnglish = false
+  // 「## 本日の語彙」などの見出しの下（--- か次の見出しまで）は、番号付きの行も語彙として読む
+  let inVocabSection = false
   for (const raw of lines) {
     // 全角数字（１．）も番号として読む
     const line = raw.trim().replace(/[０-９]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0xfee0))
     if (!line) continue
     const wasAfterEnglish = afterEnglish
     afterEnglish = false
-    if (line.startsWith('#')) continue // 見出し
+    if (line.startsWith('#')) {
+      inVocabSection = line.includes('語彙')
+      continue // 見出し
+    }
+    if (/^-{3,}$/.test(line)) {
+      inVocabSection = false
+      continue
+    }
+    if (inVocabSection) {
+      const v = parseVocab(line.replace(/^(?:[*\-•]\s+)?(?:\d+[.)．、]\s*)?/, ''))
+      if (v) vocab.push(v)
+      continue
+    }
     const item = line.match(/^[*\-•]\s+(.+)$/)
     if (item) {
       const v = parseVocab(item[1])
