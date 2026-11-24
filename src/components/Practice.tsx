@@ -13,30 +13,13 @@ interface Props {
   newBest: boolean
 }
 
-/** 正解したとき、読み上げが終わってから次の問題へ自動で進むまでの時間 */
-const AUTO_NEXT_MS = 1200
 
-/** 英文を読み上げる。終わったら（読み上げできない環境ではすぐに）onEnd を呼ぶ */
-function speak(text: string, onEnd?: () => void) {
-  if (!('speechSynthesis' in window)) {
-    onEnd?.()
-    return
-  }
+function speak(text: string) {
+  if (!('speechSynthesis' in window)) return
   speechSynthesis.cancel()
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'en-US'
   u.rate = 0.95
-  if (onEnd) {
-    let called = false
-    const end = () => {
-      if (!called) onEnd()
-      called = true
-    }
-    u.onend = end
-    u.onerror = end
-    // 端末によっては終わりの合図が来ないことがあるので、文の長さから見積もった時間で打ち切る
-    window.setTimeout(end, 2500 + text.split(' ').length * 550)
-  }
   speechSynthesis.speak(u)
 }
 
@@ -46,10 +29,6 @@ export function Practice({ problem, position, onAnswered, onNext, combo, newBest
   const [typed, setTyped] = useState<Record<number, string>>({})
   const [hint, setHint] = useState(false)
   const [result, setResult] = useState<Grade | null>(null)
-  // 正解のあと自動で次へ進むか（読み上げを聞き直したいときなどは止める）
-  const [autoNext, setAutoNext] = useState(true)
-  // 答え合わせのあとの読み上げが終わったか
-  const [spoken, setSpoken] = useState(false)
   const inputs = useRef(new Map<number, HTMLInputElement>())
   const justPlaced = useRef<number | null>(null)
 
@@ -80,14 +59,8 @@ export function Practice({ problem, position, onAnswered, onNext, combo, newBest
     const g = grade(tokens, words)
     setResult(g)
     onAnswered(g.correct)
-    speak(answerText, () => setSpoken(true))
+    speak(answerText)
   }
-
-  useEffect(() => {
-    if (!result?.correct || !autoNext || !spoken) return
-    const timer = window.setTimeout(onNext, AUTO_NEXT_MS)
-    return () => window.clearTimeout(timer)
-  }, [result, autoNext, spoken, onNext])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -224,14 +197,7 @@ export function Practice({ problem, position, onAnswered, onNext, combo, newBest
                   {t.gloss ? <strong>{t.display}</strong> : t.display}
                 </span>
               ))}
-              <button
-                className="speak"
-                onClick={() => {
-                  setAutoNext(false)
-                  speak(answerText)
-                }}
-                aria-label="読み上げ"
-              >
+              <button className="speak" onClick={() => speak(answerText)} aria-label="読み上げ">
                 🔊
               </button>
             </p>
@@ -247,18 +213,9 @@ export function Practice({ problem, position, onAnswered, onNext, combo, newBest
             </ul>
           )}
           {problem.note && <p className="note">{problem.note}</p>}
-          <button
-            className={`primary-btn next${result.correct && autoNext && spoken ? ' auto' : ''}`}
-            style={{ ['--auto-ms' as string]: `${AUTO_NEXT_MS}ms` }}
-            onClick={onNext}
-          >
-            <span>次へ</span>
+          <button className="primary-btn next" onClick={onNext}>
+            次へ
           </button>
-          {result.correct && autoNext && (
-            <button className="link-btn small stay" onClick={() => setAutoNext(false)}>
-              この問題をもう少し見る
-            </button>
-          )}
         </div>
       )}
     </div>

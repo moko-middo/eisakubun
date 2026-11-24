@@ -664,39 +664,6 @@ button:disabled {
   }
 }
 
-/* 正解のあと、自動で次へ進むまでのゲージ */
-.next {
-  position: relative;
-  overflow: hidden;
-}
-
-.next span {
-  position: relative;
-}
-
-.next.auto::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.22);
-  transform-origin: left;
-  animation: fill var(--auto-ms) linear forwards;
-}
-
-@keyframes fill {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-
-.stay {
-  display: block;
-  margin: 10px auto 0;
-}
-
 /* 目標達成の紙吹雪 */
 .confetti {
   position: fixed;
