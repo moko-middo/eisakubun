@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AnswerLog, Placed, Problem } from './types'
+import type { AnswerLog, Problem } from './types'
 import { DRILLS, PROBLEMS } from './data/drills'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { shuffle } from './lib/problem'
@@ -78,8 +78,8 @@ export default function App() {
     setRound((r) => r + 1)
   }, [])
 
-  const answered = (problem: Problem, position: string, correct: boolean, placed: Placed[]) => {
-    setLogs((prev) => [...prev, { problemId: problem.id, correct, at: new Date().toISOString(), placed }])
+  const answered = (problem: Problem, position: string, correct: boolean) => {
+    setLogs((prev) => [...prev, { problemId: problem.id, correct, at: new Date().toISOString() }])
     // 答え合わせした時点で解いたことにする（結果は「次へ」を押すまで表示したまま）
     setReviewing({ problem, position })
     setSession({ ...session, index: session.index + 1 })
@@ -139,7 +139,7 @@ export default function App() {
               key={`${round}-${shown.problem.id}`}
               problem={shown.problem}
               position={shown.position}
-              onAnswered={(correct, placed) => answered(shown.problem, shown.position, correct, placed)}
+              onAnswered={(correct) => answered(shown.problem, shown.position, correct)}
               onNext={next}
             />
           ) : (

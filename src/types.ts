@@ -41,16 +41,8 @@ export interface Card {
   prefix?: string
 }
 
-/** 並べたカード 1 枚（入力式なら入力した文字と、そのカードの日本語のヒント） */
-export interface Placed {
-  text: string
-  gloss?: string
-}
-
 export interface AnswerLog {
   problemId: string
   correct: boolean
   at: string
-  /** 自分の答え（間違いの分析に使う） */
-  placed?: Placed[]
 }

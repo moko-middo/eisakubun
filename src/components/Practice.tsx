@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Placed, Problem } from '../types'
-import { aiPrompt, analyze } from '../lib/analyze'
-import { CopyButton } from './CopyButton'
-import { grade, hintFor, prepare, type Grade } from '../lib/problem'
+import type { Problem } from '../types'
+import { grade, hintFor, matches, prepare, type Grade } from '../lib/problem'
 
 interface Props {
   problem: Problem
   position: string
-  onAnswered: (correct: boolean, placed: Placed[]) => void
+  onAnswered: (correct: boolean) => void
   onNext: () => void
 }
 
@@ -26,7 +24,6 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
   const [typed, setTyped] = useState<Record<number, string>>({})
   const [hint, setHint] = useState(false)
   const [result, setResult] = useState<Grade | null>(null)
-  const [mine, setMine] = useState<Placed[]>([])
   const inputs = useRef(new Map<number, HTMLInputElement>())
   const justPlaced = useRef<number | null>(null)
 
@@ -53,14 +50,10 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
 
   const check = () => {
     if (!canCheck || result) return
-    const answer: Placed[] = placed.map((id) =>
-      cards[id].typed ? { text: typed[id], gloss: cards[id].label } : { text: cards[id].label },
-    )
-    setMine(answer)
-    const words = answer.map((a) => a.text)
+    const words = placed.map((id) => (cards[id].typed ? typed[id] : cards[id].label))
     const g = grade(tokens, words)
     setResult(g)
-    onAnswered(g.correct, answer)
+    onAnswered(g.correct)
     speak(answerText)
   }
 
@@ -83,7 +76,12 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
   }
 
   const bank = cards.filter((c) => !placed.includes(c.id))
-  const findings = result && !result.correct ? analyze(problem, mine) : []
+  const wrongTyped = result
+    ? placed
+        .filter((id) => cards[id].typed)
+        .map((id) => ({ got: typed[id], exp: expectedFor(id) }))
+        .filter(({ got, exp }) => exp && !matches(exp, got))
+    : []
 
   return (
     <div className="practice">
@@ -192,20 +190,15 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
               </button>
             </p>
           </div>
-          {findings.length > 0 && (
-            <div className="analysis">
-              <p className="analysis-title">間違いの分析</p>
-              <ul>
-                {findings.map((f, i) => (
-                  <li key={i}>
-                    <span className={`kind kind-${f.kind}`}>{f.kind}</span>
-                    <span>{f.message}</span>
-                    {f.tip && <span className="tip">💡 {f.tip}</span>}
-                  </li>
-                ))}
-              </ul>
-              <CopyButton text={aiPrompt([{ problem, placed: mine }])} label="この間違いを AI に聞く（コピー）" />
-            </div>
+          {wrongTyped.length > 0 && (
+            <ul className="spelling">
+              {wrongTyped.map(({ got, exp }, i) => (
+                <li key={i}>
+                  <span className="got">{got}</span> → <strong>{exp!.accepts[0]}</strong>
+                  <span className="muted small">（{exp!.gloss}）</span>
+                </li>
+              ))}
+            </ul>
           )}
           {problem.note && <p className="note">{problem.note}</p>}
           <button className="primary-btn next" onClick={onNext}>
