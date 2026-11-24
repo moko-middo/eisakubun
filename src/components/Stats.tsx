@@ -4,9 +4,14 @@ interface Props {
   problems: Problem[]
   logs: AnswerLog[]
   onReset: () => void
+  goal: number
+  onGoalChange: (goal: number) => void
+  bestCombo: number
 }
 
-export function Stats({ problems, logs, onReset }: Props) {
+const GOALS = [5, 10, 20, 30]
+
+export function Stats({ problems, logs, onReset, goal, onGoalChange, bestCombo }: Props) {
   const correct = logs.filter((l) => l.correct).length
   const latest = new Map<string, boolean>()
   for (const l of logs) latest.set(l.problemId, l.correct)
@@ -43,6 +48,20 @@ export function Stats({ problems, logs, onReset }: Props) {
             <small>/{problems.length}</small>
           </strong>
         </div>
+      </div>
+
+      <div className="habit-settings">
+        <label>
+          1日の目標
+          <select value={goal} onChange={(e) => onGoalChange(Number(e.target.value))}>
+            {GOALS.map((g) => (
+              <option key={g} value={g}>
+                {g}問
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="muted small">連続正解の自己ベスト: 🔥 {bestCombo}</span>
       </div>
 
       <h3 className="section-title">ドリルごと</h3>

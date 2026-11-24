@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AnswerLog, Problem } from './types'
 import { DRILLS, PROBLEMS } from './data/drills'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { shuffle } from './lib/problem'
+import { correctFeedback, daily, goalFeedback, wrongFeedback } from './lib/habit'
+import { DailyBar } from './components/DailyBar'
+import { Confetti } from './components/Confetti'
 import { Practice } from './components/Practice'
 import { Stats } from './components/Stats'
 
@@ -23,6 +26,28 @@ interface Session {
   index: number
   /** このセッションを始めたときの一番新しいドリル。新しいドリルが届いたらそちらに切り替える */
   newest: string
+  /** 選んだ範囲を解き終えて「おすすめ」を足し始めた位置 */
+  endlessFrom?: number
+}
+
+/** 足す問題の数 */
+const BATCH = 10
+
+/**
+ * 選んだ範囲を解き終えたら、終わりにせずに足していく問題。
+ * 間違えた問題 → まだ解いていない問題 → 前に解いてから時間がたった問題 の順に選ぶ（直前に出した問題は除く）
+ */
+function nextBatch(session: Session, logs: AnswerLog[], wrongIds: Set<string>): string[] {
+  const lastSeen = new Map<string, number>()
+  for (const l of logs) lastSeen.set(l.problemId, Date.parse(l.at))
+  const recent = new Set(session.ids.slice(-BATCH))
+  const pool = PROBLEMS.filter((p) => !recent.has(p.id))
+  if (pool.length === 0) return shuffle(PROBLEMS).map((p) => p.id)
+  const rank = (p: Problem) => (wrongIds.has(p.id) ? 0 : lastSeen.has(p.id) ? 2 : 1)
+  const ordered = shuffle(pool).sort(
+    (a, b) => rank(a) - rank(b) || (rank(a) === 2 ? lastSeen.get(a.id)! - lastSeen.get(b.id)! : 0),
+  )
+  return shuffle(ordered.slice(0, BATCH)).map((p) => p.id)
 }
 
 const problemsFor = (f: string, wrongIds: Set<string>) =>
@@ -55,7 +80,18 @@ export default function App() {
     if (session !== savedSession) setSession(session)
   }, [session, savedSession, setSession])
   // 答え合わせ後、「次へ」を押すまで結果を見せておく問題
-  const [reviewing, setReviewing] = useState<{ problem: Problem; position: string } | null>(null)
+  const [reviewing, setReviewing] = useState<{
+    problem: Problem
+    position: string
+    combo: number
+    newBest: boolean
+  } | null>(null)
+  const [goal, setGoal] = useLocalStorage('sakubun.goal', 10)
+  const [sound, setSound] = useLocalStorage('sakubun.sound', true)
+  const [bestCombo, setBestCombo] = useLocalStorage('sakubun.bestCombo', 0)
+  const [combo, setCombo] = useState(0)
+  const [celebrate, setCelebrate] = useState(false)
+  const celebrateTimer = useRef<number>(undefined)
   // 同じ問題が続けて出たときも Practice を作り直すための番号
   const [round, setRound] = useState(0)
 
@@ -71,7 +107,24 @@ export default function App() {
 
   const queue = session.ids.map((id) => BY_ID.get(id)!)
   const current = queue[session.index]
-  const shown = reviewing ?? (current && { problem: current, position: `${session.index + 1} / ${queue.length}` })
+  const endless = session.endlessFrom !== undefined && session.index >= session.endlessFrom
+  const position = endless
+    ? `おすすめ ${session.index - session.endlessFrom! + 1}問目`
+    : `${session.index + 1} / ${session.endlessFrom ?? queue.length}`
+  const shown = reviewing ?? (current && { problem: current, position, combo: 0, newBest: false })
+
+  // 選んだ範囲を解き終えたら、おすすめの問題を足して続ける
+  useEffect(() => {
+    if (!current && !reviewing && PROBLEMS.length > 0) {
+      setSession({
+        ...session,
+        ids: [...session.ids, ...nextBatch(session, logs, wrongIds)],
+        endlessFrom: session.endlessFrom ?? session.ids.length,
+      })
+    }
+  })
+
+  const today = daily(logs, goal)
 
   const next = useCallback(() => {
     setReviewing(null)
@@ -80,8 +133,21 @@ export default function App() {
 
   const answered = (problem: Problem, position: string, correct: boolean) => {
     setLogs((prev) => [...prev, { problemId: problem.id, correct, at: new Date().toISOString() }])
+    const nextCombo = correct ? combo + 1 : 0
+    const newBest = nextCombo > bestCombo && nextCombo >= 3
+    setCombo(nextCombo)
+    if (newBest) setBestCombo(nextCombo)
+    if (correct) correctFeedback(nextCombo, sound)
+    else wrongFeedback(sound)
+    // 今日の目標をちょうど達成したら花火
+    if (today.today + 1 === goal) {
+      setTimeout(() => goalFeedback(sound), 350)
+      setCelebrate(true)
+      window.clearTimeout(celebrateTimer.current)
+      celebrateTimer.current = window.setTimeout(() => setCelebrate(false), 3500)
+    }
     // 答え合わせした時点で解いたことにする（結果は「次へ」を押すまで表示したまま）
-    setReviewing({ problem, position })
+    setReviewing({ problem, position, combo: nextCombo, newBest })
     setSession({ ...session, index: session.index + 1 })
   }
 
@@ -96,8 +162,9 @@ export default function App() {
         <h1>
           英作文<span>ドリル</span>
         </h1>
-        <p className="muted small">センテンスリピートドリルの英文を、並べ替えと入力で組み立てる</p>
+        <DailyBar daily={today} sound={sound} onToggleSound={() => setSound(!sound)} />
       </header>
+      {celebrate && <Confetti streak={today.streak} />}
       <nav className="tabs">
         <button className={tab === 'practice' ? 'active' : ''} onClick={() => switchTab('practice')}>
           練習
@@ -108,7 +175,7 @@ export default function App() {
       </nav>
 
       {tab === 'stats' ? (
-        <Stats problems={PROBLEMS} logs={logs} onReset={() => setLogs([])} />
+        <Stats problems={PROBLEMS} logs={logs} onReset={() => setLogs([])} goal={goal} onGoalChange={setGoal} bestCombo={bestCombo} />
       ) : (
         <>
           <div className="filter">
@@ -123,7 +190,9 @@ export default function App() {
                 {REVIEW}（{wrongIds.size}）
               </option>
             </select>
-            {session.filter === REVIEW ? (
+            {endless ? (
+              <p className="muted small review-note">選んだ問題はひと通り解きました。ここからは、間違えた問題やしばらく解いていない問題が続きます。</p>
+            ) : session.filter === REVIEW ? (
               <p className="muted small review-note">間違えた問題の復習中。正解するとその問題は復習リストから外れます。</p>
             ) : (
               wrongIds.size > 0 && (
@@ -141,26 +210,16 @@ export default function App() {
               position={shown.position}
               onAnswered={(correct) => answered(shown.problem, shown.position, correct)}
               onNext={next}
+              combo={reviewing ? shown.combo : 0}
+              newBest={reviewing ? shown.newBest : false}
             />
           ) : (
             <div className="done">
               <p>
                 {PROBLEMS.length === 0
                   ? 'まだドリルがありません。content/drills/ に MD ファイルが入ると、ここに問題が出ます。'
-                  : queue.length === 0
-                    ? '出題できる問題がありません。'
-                    : `${queue.length} 問おわりました。`}
+                  : '読み込み中…'}
               </p>
-              <div className="actions">
-                {wrongIds.size > 0 && (
-                  <button className="sub-btn" onClick={() => start(REVIEW)}>
-                    間違えた問題（{wrongIds.size}）
-                  </button>
-                )}
-                <button className="primary-btn" onClick={() => start(session.filter === REVIEW ? NEWEST : session.filter)}>
-                  もう一度
-                </button>
-              </div>
             </div>
           )}
         </>

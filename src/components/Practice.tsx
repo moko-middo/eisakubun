@@ -7,7 +7,14 @@ interface Props {
   position: string
   onAnswered: (correct: boolean) => void
   onNext: () => void
+  /** 答え合わせ後の連続正解数 */
+  combo: number
+  /** 連続正解の自己ベストを更新したか */
+  newBest: boolean
 }
+
+/** 正解したとき、次の問題へ自動で進むまでの時間 */
+const AUTO_NEXT_MS = 1800
 
 function speak(text: string) {
   if (!('speechSynthesis' in window)) return
@@ -18,12 +25,14 @@ function speak(text: string) {
   speechSynthesis.speak(u)
 }
 
-export function Practice({ problem, position, onAnswered, onNext }: Props) {
+export function Practice({ problem, position, onAnswered, onNext, combo, newBest }: Props) {
   const { tokens, cards } = useMemo(() => prepare(problem), [problem])
   const [placed, setPlaced] = useState<number[]>([])
   const [typed, setTyped] = useState<Record<number, string>>({})
   const [hint, setHint] = useState(false)
   const [result, setResult] = useState<Grade | null>(null)
+  // 正解のあと自動で次へ進むか（読み上げを聞き直したいときなどは止める）
+  const [autoNext, setAutoNext] = useState(true)
   const inputs = useRef(new Map<number, HTMLInputElement>())
   const justPlaced = useRef<number | null>(null)
 
@@ -56,6 +65,12 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
     onAnswered(g.correct)
     speak(answerText)
   }
+
+  useEffect(() => {
+    if (!result?.correct || !autoNext) return
+    const timer = window.setTimeout(onNext, AUTO_NEXT_MS)
+    return () => window.clearTimeout(timer)
+  }, [result, autoNext, onNext])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -174,7 +189,14 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
 
       {result && (
         <div className="result">
-          <p className={`verdict ${result.correct ? 'ok' : 'ng'}`}>{result.correct ? '○ 正解' : '× 不正解'}</p>
+          <div className="verdict-row">
+            <p className={`verdict ${result.correct ? 'ok' : 'ng'}`}>{result.correct ? '○ 正解' : '× 不正解'}</p>
+            {combo >= 2 && (
+              <span key={combo} className="combo">
+                🔥 {combo}連続正解{newBest && <em>自己ベスト！</em>}
+              </span>
+            )}
+          </div>
           <div className="model">
             <span className="muted small">模範解答</span>
             <p>
@@ -185,7 +207,14 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
                   {t.gloss ? <strong>{t.display}</strong> : t.display}
                 </span>
               ))}
-              <button className="speak" onClick={() => speak(answerText)} aria-label="読み上げ">
+              <button
+                className="speak"
+                onClick={() => {
+                  setAutoNext(false)
+                  speak(answerText)
+                }}
+                aria-label="読み上げ"
+              >
                 🔊
               </button>
             </p>
@@ -201,9 +230,18 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
             </ul>
           )}
           {problem.note && <p className="note">{problem.note}</p>}
-          <button className="primary-btn next" onClick={onNext}>
-            次へ
+          <button
+            className={`primary-btn next${result.correct && autoNext ? ' auto' : ''}`}
+            style={{ ['--auto-ms' as string]: `${AUTO_NEXT_MS}ms` }}
+            onClick={onNext}
+          >
+            <span>次へ</span>
           </button>
+          {result.correct && autoNext && (
+            <button className="link-btn small stay" onClick={() => setAutoNext(false)}>
+              この問題をもう少し見る
+            </button>
+          )}
         </div>
       )}
     </div>
