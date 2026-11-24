@@ -8,8 +8,9 @@ import { DailyBar } from './components/DailyBar'
 import { Confetti } from './components/Confetti'
 import { Practice } from './components/Practice'
 import { Stats } from './components/Stats'
+import { Journey } from './components/Journey'
 
-type Tab = 'practice' | 'stats'
+type Tab = 'practice' | 'journey' | 'stats'
 
 const ALL = 'すべて'
 const REVIEW = '間違えた問題'
@@ -169,12 +170,17 @@ export default function App() {
         <button className={tab === 'practice' ? 'active' : ''} onClick={() => switchTab('practice')}>
           練習
         </button>
+        <button className={tab === 'journey' ? 'active' : ''} onClick={() => switchTab('journey')}>
+          あゆみ
+        </button>
         <button className={tab === 'stats' ? 'active' : ''} onClick={() => switchTab('stats')}>
           記録
         </button>
       </nav>
 
-      {tab === 'stats' ? (
+      {tab === 'journey' ? (
+        <Journey logs={logs} goal={goal} />
+      ) : tab === 'stats' ? (
         <Stats problems={PROBLEMS} logs={logs} onReset={() => setLogs([])} goal={goal} onGoalChange={setGoal} bestCombo={bestCombo} />
       ) : (
         <>

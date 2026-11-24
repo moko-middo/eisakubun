@@ -737,3 +737,146 @@ button:disabled {
     display: none;
   }
 }
+
+/* ── あゆみ ── */
+
+.record-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.record {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.record-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.record strong {
+  font-size: 1.7rem;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.record strong small {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.calendar {
+  display: flex;
+  gap: 4px;
+}
+
+.weekday-labels {
+  display: grid;
+  grid-template-rows: 14px repeat(7, 1fr);
+  gap: 3px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.weekday-labels::before {
+  content: '';
+}
+
+.weekday-labels span {
+  display: flex;
+  align-items: center;
+}
+
+.weeks {
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.week {
+  display: grid;
+  grid-template-rows: 14px repeat(7, auto);
+  gap: 3px;
+  min-width: 0;
+}
+
+.month {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.block {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 2px;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.block.air {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.block.future {
+  visibility: hidden;
+}
+
+.block.today {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.block.selected {
+  outline: 2px solid #e0a066;
+  outline-offset: 1px;
+}
+
+.small-block {
+  display: inline-block;
+  width: 20px;
+  vertical-align: middle;
+  flex: none;
+}
+
+.selected-day {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.legend {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 10px;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.legend .have {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
