@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Problem } from '../types'
-import { grade, hintFor, normalize, prepare, type Grade } from '../lib/problem'
+import { grade, hintFor, matches, prepare, type Grade } from '../lib/problem'
 
 interface Props {
   problem: Problem
@@ -27,7 +27,7 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
   const inputs = useRef(new Map<number, HTMLInputElement>())
   const justPlaced = useRef<number | null>(null)
 
-  const answerText = tokens.map((t) => t.display).join(' ')
+  const answerText = tokens.map((t) => (t.prefix ? `${t.prefix} ${t.display}` : t.display)).join(' ')
   const canCheck = placed.length > 0 && placed.every((id) => !cards[id].typed || typed[id]?.trim())
 
   // 入力式カードを置いたらその入力欄にフォーカス
@@ -80,7 +80,7 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
     ? placed
         .filter((id) => cards[id].typed)
         .map((id) => ({ got: typed[id], exp: expectedFor(id) }))
-        .filter(({ got, exp }) => exp && !exp.accepts.includes(normalize(got)))
+        .filter(({ got, exp }) => exp && !matches(exp, got))
     : []
 
   return (
@@ -107,6 +107,7 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
           const value = typed[id] ?? ''
           return (
             <span key={id} className={`chip typed placed${state}`}>
+              {c.prefix && <span className="prefix">{c.prefix}</span>}
               <input
                 ref={(el) => {
                   if (el) inputs.current.set(id, el)
@@ -144,6 +145,7 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
             {bank.map((c) => (
               <button key={c.id} className={`chip${c.typed ? ' typed-card' : ''}`} onClick={() => place(c.id)}>
                 {c.typed && <span className="pen">✎</span>}
+                {c.prefix && <span className="prefix">{c.prefix}</span>}
                 {c.label}
               </button>
             ))}
@@ -179,6 +181,7 @@ export function Practice({ problem, position, onAnswered, onNext }: Props) {
               {tokens.map((t, i) => (
                 <span key={i}>
                   {i > 0 && ' '}
+                  {t.prefix && `${t.prefix} `}
                   {t.gloss ? <strong>{t.display}</strong> : t.display}
                 </span>
               ))}

@@ -458,3 +458,14 @@ button:disabled {
   }
 }
 
+
+/* 入力式の前に付く冠詞（入力しなくてよい） */
+.prefix {
+  font-family: Georgia, 'Times New Roman', serif;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.chip.typed-card .prefix {
+  color: var(--primary);
+}

@@ -3,11 +3,13 @@ import { normalize } from './problem'
 
 const JAPANESE = /[぀-ヿ㐀-鿿！-｠]/
 /** 語彙の見出しで「だれか・なにか」を表す語（文中では別の語に置き換わる） */
-const PLACEHOLDER = /^(?:someone|somebody|something|sb|sth|one's|A|B)$/
+const PLACEHOLDER = /^(?:someone|somebody|something|sb|sth|one's|A|B|~|〜|～|…|\.\.\.)$/
 const CIRCLED = '①②③④⑤⑥⑦⑧⑨'
 
 interface Vocab {
   term: string
+  /** 「stalling / stall」のように / で並べた書き方は、どれか 1 つが文中にあればよい */
+  forms: string[]
   gloss: string
 }
 
@@ -21,7 +23,22 @@ function parseVocab(line: string): Vocab | null {
     .trim()
     .replace(/[）)]$/, '')
     .trim()
-  return /[A-Za-z]/.test(term) && gloss ? { term, gloss } : null
+  const forms = term
+    .split('/')
+    .map((f) => f.trim())
+    .filter((f) => /[A-Za-z]/.test(f))
+    .sort((a, b) => b.length - a.length)
+  return forms.length && gloss ? { term, forms, gloss } : null
+}
+
+/**
+ * ヒント用に語彙の意味を短くする。最初の「／」「。」まで、かっこ書きの補足は外す。
+ * ただし先頭のかっこ（「（車が）エンストする」の「（車が）」）は意味の一部なので残す
+ */
+function shortGloss(gloss: string) {
+  const first = gloss.split(/[／。]/)[0]
+  const m = first.match(/^([（(][^）)]*[）)])?([^（(]*)/)
+  return ((m?.[1] ?? '') + (m?.[2] ?? '')).trim() || gloss
 }
 
 const bare = (w: string) =>
@@ -73,11 +90,15 @@ function sentenceTokens(en: string, vocab: Vocab[]): { tokens: Token[]; used: Vo
     let from = 0
     let found = false
     for (;;) {
-      const runs = findTerm(words, v.term, from)
+      let runs: [number, number][] | null = null
+      for (const form of v.forms) {
+        const r = findTerm(words, form, from)
+        if (r && (!runs || r[0][0] < runs[0][0])) runs = r
+      }
       if (!runs) break
       if (!runs.some(([s, e]) => overlaps(s, e))) {
         // 日本語のヒントは、かっこ書きの補足を外した短い形にする
-        const short = v.gloss.split(/[（(]/)[0].trim() || v.gloss
+        const short = shortGloss(v.gloss)
         for (const [s, e] of runs) spans.push({ start: s, end: e, gloss: short })
         found = true
       }
@@ -111,7 +132,30 @@ function sentenceTokens(en: string, vocab: Vocab[]): { tokens: Token[]; used: Vo
       i++
     }
   }
-  return { tokens, used }
+  return { tokens: attachArticles(tokens), used }
+}
+
+const ARTICLE = /^(?:a|an|the)$/i
+
+/** 冠詞（a / an / the）は覚える対象にしないので、後ろの語とくっつけて 1 枚のカードにする */
+function attachArticles(tokens: Token[]): Token[] {
+  const out: Token[] = []
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]
+    const next = tokens[i + 1]
+    if (t.gloss || !ARTICLE.test(t.display) || !next) {
+      out.push(t)
+    } else if (next.gloss) {
+      // 入力式の語の前の冠詞は、入力欄の前に表示するだけ
+      out.push({ ...next, prefix: t.display })
+      i++
+    } else {
+      const display = `${t.display} ${next.display}`
+      out.push({ display, accepts: [normalize(display)] })
+      i++
+    }
+  }
+  return out
 }
 
 /** ファイル名（2026-11-17 / 2026-11-17_2）から一覧に出す名前を作る */

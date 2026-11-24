@@ -27,6 +27,8 @@ export interface Token {
   accepts: string[]
   /** 入力式なら日本語のヒント */
   gloss?: string
+  /** 入力式の前に付いている冠詞（a / an / the）。入力欄の前に表示し、入力はしなくてよい */
+  prefix?: string
 }
 
 /** 並べ替えの選択肢カード */
@@ -35,6 +37,8 @@ export interface Card {
   /** 並べ替えカードなら英語、入力式なら日本語のヒント */
   label: string
   typed: boolean
+  /** 入力式の前に付いている冠詞 */
+  prefix?: string
 }
 
 export interface AnswerLog {
