@@ -8,7 +8,6 @@ import { DailyBar } from './components/DailyBar'
 import { Confetti } from './components/Confetti'
 import { Practice } from './components/Practice'
 import { Stats } from './components/Stats'
-import { BackupBanner } from './components/Backup'
 import { useSyncConfig } from './components/SyncSettings'
 import { scheduleSync, syncNow } from './lib/sync'
 import { Rewards, type Progos } from './components/Rewards'
@@ -98,9 +97,6 @@ export default function App() {
   const [progos, setProgos] = useLocalStorage<Progos>('sakubun.progos', { last: 'B1', best: 'B1', pending: false })
   const [sound, setSound] = useLocalStorage('sakubun.sound', true)
   const [bestCombo, setBestCombo] = useLocalStorage('sakubun.bestCombo', 0)
-  // バックアップ: 最後に保存した日と、「あとで」を押した日（その日はもうお知らせを出さない）
-  const [lastBackup, setLastBackup] = useLocalStorage<string | null>('sakubun.lastBackup', null)
-  const [backupLater, setBackupLater] = useLocalStorage<string | null>('sakubun.backupLater', null)
   const sync = useSyncConfig()
 
   // GitHub との同期: 開いたとき・電波が戻ったとき・アプリを離れたときにすぐ、記録が変わったら少し待ってから
@@ -212,12 +208,6 @@ export default function App() {
           ⚠️ GitHub と同期できていません（記録タブで確認）
         </button>
       )}
-      {!sync && logs.length > 0 && lastBackup !== localDate(new Date()) && backupLater !== localDate(new Date()) && (
-        <BackupBanner
-          onSaved={() => setLastBackup(localDate(new Date()))}
-          onLater={() => setBackupLater(localDate(new Date()))}
-        />
-      )}
       <nav className="tabs">
         <button className={tab === 'practice' ? 'active' : ''} onClick={() => switchTab('practice')}>
           練習
@@ -259,8 +249,6 @@ export default function App() {
           goal={goal}
           onGoalChange={setGoal}
           bestCombo={bestCombo}
-          lastBackup={lastBackup}
-          onBackupSaved={() => setLastBackup(localDate(new Date()))}
         />
       ) : (
         <>

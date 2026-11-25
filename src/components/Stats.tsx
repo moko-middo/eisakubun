@@ -1,5 +1,4 @@
 import type { AnswerLog, Problem } from '../types'
-import { Backup } from './Backup'
 import { SyncSettings } from './SyncSettings'
 
 interface Props {
@@ -9,13 +8,11 @@ interface Props {
   goal: number
   onGoalChange: (goal: number) => void
   bestCombo: number
-  lastBackup: string | null
-  onBackupSaved: () => void
 }
 
 const GOALS = [5, 10, 20, 30]
 
-export function Stats({ problems, logs, onReset, goal, onGoalChange, bestCombo, lastBackup, onBackupSaved }: Props) {
+export function Stats({ problems, logs, onReset, goal, onGoalChange, bestCombo }: Props) {
   const correct = logs.filter((l) => l.correct).length
   const latest = new Map<string, boolean>()
   for (const l of logs) latest.set(l.problemId, l.correct)
@@ -87,8 +84,6 @@ export function Stats({ problems, logs, onReset, goal, onGoalChange, bestCombo, 
       <p className="muted small">「クリア」は最後に解いたとき正解だった問題の数です。</p>
 
       <SyncSettings />
-
-      <Backup lastBackup={lastBackup} onSaved={onBackupSaved} />
 
       {logs.length > 0 && (
         <button className="sub-btn reset" onClick={() => confirm('記録をすべて消しますか？') && onReset()}>

@@ -3,7 +3,7 @@ import { STORAGE_SYNCED } from '../hooks/useLocalStorage'
 /**
  * GitHub の非公開リポジトリ（moko-middo/eisakubun-data）の sync.json に記録を保存し、複数の端末で同じ記録を使う。
  *
- * - トークンはこの端末の localStorage（eisakubun.sync）にだけ置く。sakubun. で始まらないので、同期やバックアップのファイルには入らない
+ * - トークンはこの端末の localStorage（eisakubun.sync）にだけ置く。同期のファイルには入れない
  * - 合わせ方は「前回の同期のときの内容」を基準にした 3 方向マージ
  *   - 記録・お金の出入り・ごほうび（一覧）: 両方で増えたものは両方残し、どちらかで消したものは消す
  *   - 設定など（1 つの値）: この端末で変えていればこの端末の値、変えていなければ GitHub の値
@@ -14,7 +14,7 @@ export const SYNC_REPO = { owner: 'moko-middo', repo: 'eisakubun-data', path: 's
 const CONFIG_KEY = 'eisakubun.sync'
 const BASE_KEY = 'eisakubun.sync.base'
 
-/** 同期するもの。どこまで解いたか・効果音・バックアップのお知らせは端末ごと */
+/** 同期するもの。どこまで解いたか・効果音は端末ごと */
 const LISTS: Record<string, (x: Record<string, unknown>) => string> = {
   'sakubun.drill.logs': (x) => `${x.problemId}|${x.at}`,
   'sakubun.wallet': (x) => String(x.id),
