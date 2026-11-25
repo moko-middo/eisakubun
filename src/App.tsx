@@ -3,14 +3,15 @@ import type { AnswerLog, Problem } from './types'
 import { DRILLS, PROBLEMS } from './data/drills'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { shuffle } from './lib/problem'
-import { correctFeedback, daily, goalFeedback, wrongFeedback } from './lib/habit'
+import { correctFeedback, daily, goalFeedback, localDate, wrongFeedback } from './lib/habit'
 import { DailyBar } from './components/DailyBar'
 import { Confetti } from './components/Confetti'
 import { Practice } from './components/Practice'
 import { Stats } from './components/Stats'
-import { Journey } from './components/Journey'
+import { Rewards, type Progos } from './components/Rewards'
+import { earnings, LEVELS, progosBonus, PROGOS_PRICE, yen, type Entry, type Level, type Reward } from './lib/wallet'
 
-type Tab = 'practice' | 'journey' | 'stats'
+type Tab = 'practice' | 'rewards' | 'stats'
 
 const ALL = 'すべて'
 const REVIEW = '間違えた問題'
@@ -88,6 +89,10 @@ export default function App() {
     newBest: boolean
   } | null>(null)
   const [goal, setGoal] = useLocalStorage('sakubun.goal', 10)
+  // ごほうび貯金: 使ったお金・ボーナスの記録、登録したごほうび、PROGOS の結果
+  const [entries, setEntries] = useLocalStorage<Entry[]>('sakubun.wallet', [])
+  const [rewards, setRewards] = useLocalStorage<Reward[]>('sakubun.rewards', [])
+  const [progos, setProgos] = useLocalStorage<Progos>('sakubun.progos', { last: 'B1', best: 'B1', pending: false })
   const [sound, setSound] = useLocalStorage('sakubun.sound', true)
   const [bestCombo, setBestCombo] = useLocalStorage('sakubun.bestCombo', 0)
   const [combo, setCombo] = useState(0)
@@ -126,6 +131,12 @@ export default function App() {
   })
 
   const today = daily(logs, goal)
+  const days = earnings(logs, goal)
+  const balance = days.reduce((s, d) => s + d.total, 0) + entries.reduce((s, e) => s + e.amount, 0)
+  const todayEarned = days.find((d) => d.date === localDate(new Date()))?.total ?? 0
+
+  const addEntry = (label: string, amount: number) =>
+    setEntries((prev) => [...prev, { id: crypto.randomUUID(), at: new Date().toISOString(), label, amount }])
 
   const next = useCallback(() => {
     setReviewing(null)
@@ -160,26 +171,50 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
+        <div className="header-row">
         <h1>
           英作文<span>ドリル</span>
         </h1>
+        <button className="balance-chip" onClick={() => switchTab('rewards')} aria-label="ごほうび貯金">
+          💰 {yen(balance)}
+        </button>
+        </div>
         <DailyBar daily={today} sound={sound} onToggleSound={() => setSound(!sound)} />
       </header>
-      {celebrate && <Confetti streak={today.streak} />}
+      {celebrate && <Confetti streak={today.streak} earned={todayEarned} />}
       <nav className="tabs">
         <button className={tab === 'practice' ? 'active' : ''} onClick={() => switchTab('practice')}>
           練習
         </button>
-        <button className={tab === 'journey' ? 'active' : ''} onClick={() => switchTab('journey')}>
-          あゆみ
+        <button className={tab === 'rewards' ? 'active' : ''} onClick={() => switchTab('rewards')}>
+          ごほうび
         </button>
         <button className={tab === 'stats' ? 'active' : ''} onClick={() => switchTab('stats')}>
           記録
         </button>
       </nav>
 
-      {tab === 'journey' ? (
-        <Journey logs={logs} goal={goal} />
+      {tab === 'rewards' ? (
+        <Rewards
+          balance={balance}
+          days={days}
+          entries={entries}
+          rewards={rewards}
+          progos={progos}
+          onTakeProgos={() => {
+            addEntry('PROGOS を受けた', -PROGOS_PRICE)
+            setProgos({ ...progos, pending: true })
+          }}
+          onProgosResult={(level: Level) => {
+            const bonus = progosBonus(level, progos.last, progos.best)
+            addEntry(bonus.label, bonus.amount)
+            const best = LEVELS.indexOf(level) > LEVELS.indexOf(progos.best) ? level : progos.best
+            setProgos({ last: level, best, pending: false })
+          }}
+          onBuy={(r) => addEntry(r.name, -r.price)}
+          onAddReward={(name, price) => setRewards((prev) => [...prev, { id: crypto.randomUUID(), name, price }])}
+          onDeleteReward={(id) => setRewards((prev) => prev.filter((r) => r.id !== id))}
+        />
       ) : tab === 'stats' ? (
         <Stats problems={PROBLEMS} logs={logs} onReset={() => setLogs([])} goal={goal} onGoalChange={setGoal} bestCombo={bestCombo} />
       ) : (

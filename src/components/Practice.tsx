@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Problem } from '../types'
 import { grade, hintFor, matches, prepare, type Grade } from '../lib/problem'
+import { EARN } from '../lib/wallet'
 
 interface Props {
   problem: Problem
@@ -181,6 +182,7 @@ export function Practice({ problem, position, onAnswered, onNext, combo, newBest
         <div className="result">
           <div className="verdict-row">
             <p className={`verdict ${result.correct ? 'ok' : 'ng'}`}>{result.correct ? '○ 正解' : '× 不正解'}</p>
+            {result.correct && <span className="earn">💰 +{EARN.correct}円</span>}
             {combo >= 2 && (
               <span key={combo} className="combo">
                 🔥 {combo}連続正解{newBest && <em>自己ベスト！</em>}

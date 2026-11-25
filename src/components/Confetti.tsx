@@ -1,7 +1,7 @@
 const COLORS = ['#2f6f5e', '#ffe27a', '#e0a066', '#6fbfa6', '#ef7a66', '#7a4fb0']
 
 /** 今日の目標を達成したときの紙吹雪 */
-export function Confetti({ streak }: { streak: number }) {
+export function Confetti({ streak, earned }: { streak: number; earned: number }) {
   const pieces = Array.from({ length: 70 }, (_, i) => ({
     left: Math.random() * 100,
     delay: Math.random() * 0.6,
@@ -27,6 +27,8 @@ export function Confetti({ streak }: { streak: number }) {
         🎉 今日の目標達成！
         <br />
         <span>🔥 {streak}日連続</span>
+        <br />
+        <span className="earned">💰 今日 +{earned.toLocaleString('ja-JP')}円</span>
       </div>
     </div>
   )
