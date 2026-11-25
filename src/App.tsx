@@ -8,6 +8,7 @@ import { DailyBar } from './components/DailyBar'
 import { Confetti } from './components/Confetti'
 import { Practice } from './components/Practice'
 import { Stats } from './components/Stats'
+import { BackupBanner } from './components/Backup'
 import { Rewards, type Progos } from './components/Rewards'
 import { earnings, LEVELS, progosBonus, PROGOS_PRICE, yen, type Entry, type Level, type Reward } from './lib/wallet'
 
@@ -95,6 +96,9 @@ export default function App() {
   const [progos, setProgos] = useLocalStorage<Progos>('sakubun.progos', { last: 'B1', best: 'B1', pending: false })
   const [sound, setSound] = useLocalStorage('sakubun.sound', true)
   const [bestCombo, setBestCombo] = useLocalStorage('sakubun.bestCombo', 0)
+  // バックアップ: 最後に保存した日と、「あとで」を押した日（その日はもうお知らせを出さない）
+  const [lastBackup, setLastBackup] = useLocalStorage<string | null>('sakubun.lastBackup', null)
+  const [backupLater, setBackupLater] = useLocalStorage<string | null>('sakubun.backupLater', null)
   const [combo, setCombo] = useState(0)
   const [celebrate, setCelebrate] = useState(false)
   const celebrateTimer = useRef<number>(undefined)
@@ -182,6 +186,12 @@ export default function App() {
         <DailyBar daily={today} sound={sound} onToggleSound={() => setSound(!sound)} />
       </header>
       {celebrate && <Confetti streak={today.streak} earned={todayEarned} />}
+      {logs.length > 0 && lastBackup !== localDate(new Date()) && backupLater !== localDate(new Date()) && (
+        <BackupBanner
+          onSaved={() => setLastBackup(localDate(new Date()))}
+          onLater={() => setBackupLater(localDate(new Date()))}
+        />
+      )}
       <nav className="tabs">
         <button className={tab === 'practice' ? 'active' : ''} onClick={() => switchTab('practice')}>
           練習
@@ -216,7 +226,16 @@ export default function App() {
           onDeleteReward={(id) => setRewards((prev) => prev.filter((r) => r.id !== id))}
         />
       ) : tab === 'stats' ? (
-        <Stats problems={PROBLEMS} logs={logs} onReset={() => setLogs([])} goal={goal} onGoalChange={setGoal} bestCombo={bestCombo} />
+        <Stats
+          problems={PROBLEMS}
+          logs={logs}
+          onReset={() => setLogs([])}
+          goal={goal}
+          onGoalChange={setGoal}
+          bestCombo={bestCombo}
+          lastBackup={lastBackup}
+          onBackupSaved={() => setLastBackup(localDate(new Date()))}
+        />
       ) : (
         <>
           <div className="filter">

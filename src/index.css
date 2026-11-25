@@ -918,3 +918,39 @@ button:disabled {
   display: block;
   margin: 10px auto 0;
 }
+
+/* ── バックアップ ── */
+
+.backup-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--primary-soft);
+  font-size: 0.9rem;
+}
+
+.backup-banner > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.backup-banner .primary-btn {
+  padding: 6px 16px;
+}
+
+.backup-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.backup-message {
+  margin-top: 8px;
+  color: var(--primary);
+}
