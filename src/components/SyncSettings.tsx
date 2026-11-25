@@ -69,7 +69,7 @@ export function SyncSettings() {
             同期を始める
           </button>
         </form>
-        <p className="muted small">鍵はこのブラウザの中だけに保存され、同期のファイルやバックアップには入りません。</p>
+        <p className="muted small">鍵はこのブラウザの中だけに保存され、同期のファイルには入りません。</p>
       </div>
     )
   }

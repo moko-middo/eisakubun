@@ -19,6 +19,8 @@ const LISTS: Record<string, (x: Record<string, unknown>) => string> = {
   'sakubun.drill.logs': (x) => `${x.problemId}|${x.at}`,
   'sakubun.wallet': (x) => String(x.id),
   'sakubun.rewards': (x) => String(x.id),
+  'sakubun.snapshots': (x) => String(x.id),
+  'sakubun.drillMeta': (x) => String(x.name),
 }
 const VALUES = ['sakubun.goal', 'sakubun.progos']
 const MAXES = ['sakubun.bestCombo']

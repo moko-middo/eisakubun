@@ -12,6 +12,8 @@ interface Props {
   combo: number
   /** 連続正解の自己ベストを更新したか */
   newBest: boolean
+  /** 苦手ノートの出入りのお知らせ */
+  badge?: string
 }
 
 
@@ -24,7 +26,7 @@ function speak(text: string) {
   speechSynthesis.speak(u)
 }
 
-export function Practice({ problem, position, onAnswered, onNext, combo, newBest }: Props) {
+export function Practice({ problem, position, onAnswered, onNext, combo, newBest, badge }: Props) {
   const { tokens, cards } = useMemo(() => prepare(problem), [problem])
   const [placed, setPlaced] = useState<number[]>([])
   const [typed, setTyped] = useState<Record<number, string>>({})
@@ -189,6 +191,7 @@ export function Practice({ problem, position, onAnswered, onNext, combo, newBest
               </span>
             )}
           </div>
+          {badge && <p className="note-badge">{badge}</p>}
           <div className="model">
             <span className="muted small">模範解答</span>
             <p>

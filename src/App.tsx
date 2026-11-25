@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AnswerLog, Problem } from './types'
-import { DRILLS, PROBLEMS } from './data/drills'
+import { ALL_PROBLEMS, DRILLS, PROBLEMS } from './data/drills'
+import { GRADUATE, metaOf, notebook, type DrillMeta, type Snapshot } from './lib/notebook'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { shuffle } from './lib/problem'
 import { correctFeedback, daily, goalFeedback, localDate, wrongFeedback } from './lib/habit'
@@ -16,10 +17,11 @@ import { earnings, LEVELS, progosBonus, PROGOS_PRICE, yen, type Entry, type Leve
 type Tab = 'practice' | 'rewards' | 'stats'
 
 const ALL = 'すべて'
-const REVIEW = '間違えた問題'
+const REVIEW = '苦手ノート'
 /** 最初は一番新しいドリルを出す */
 const NEWEST = DRILLS[0]?.label ?? ALL
-const BY_ID = new Map(PROBLEMS.map((p) => [p.id, p]))
+/** ファイルが残っている問題。苦手ノートの問題は、ファイルが消えてもコピーから引く */
+const FILE_PROBLEMS = new Map(ALL_PROBLEMS.map((p) => [p.id, p]))
 
 /** 出題の進み具合。ブラウザに保存し、タブを切り替えたり開き直したりしても続きから出す */
 interface Session {
@@ -41,44 +43,73 @@ const BATCH = 10
  * 選んだ範囲を解き終えたら、終わりにせずに足していく問題。
  * 間違えた問題 → まだ解いていない問題 → 前に解いてから時間がたった問題 の順に選ぶ（直前に出した問題は除く）
  */
-function nextBatch(session: Session, logs: AnswerLog[], wrongIds: Set<string>): string[] {
+function nextBatch(session: Session, logs: AnswerLog[], noteIds: Set<string>, lookup: Map<string, Problem>): string[] {
   const lastSeen = new Map<string, number>()
   for (const l of logs) lastSeen.set(l.problemId, Date.parse(l.at))
   const recent = new Set(session.ids.slice(-BATCH))
-  const pool = PROBLEMS.filter((p) => !recent.has(p.id))
-  if (pool.length === 0) return shuffle(PROBLEMS).map((p) => p.id)
-  const rank = (p: Problem) => (wrongIds.has(p.id) ? 0 : lastSeen.has(p.id) ? 2 : 1)
+  const all = [...new Map([...PROBLEMS, ...[...noteIds].map((id) => lookup.get(id)!)].map((p) => [p.id, p])).values()]
+  const pool = all.filter((p) => !recent.has(p.id))
+  if (pool.length === 0) return shuffle(all).map((p) => p.id)
+  const rank = (p: Problem) => (noteIds.has(p.id) ? 0 : lastSeen.has(p.id) ? 2 : 1)
   const ordered = shuffle(pool).sort(
     (a, b) => rank(a) - rank(b) || (rank(a) === 2 ? lastSeen.get(a.id)! - lastSeen.get(b.id)! : 0),
   )
   return shuffle(ordered.slice(0, BATCH)).map((p) => p.id)
 }
 
-const problemsFor = (f: string, wrongIds: Set<string>) =>
-  f === ALL ? PROBLEMS : f === REVIEW ? PROBLEMS.filter((p) => wrongIds.has(p.id)) : PROBLEMS.filter((p) => p.tag === f)
+const problemsFor = (f: string, noteIds: Set<string>, lookup: Map<string, Problem>) =>
+  f === ALL
+    ? PROBLEMS
+    : f === REVIEW
+      ? [...noteIds].map((id) => lookup.get(id)!)
+      : PROBLEMS.filter((p) => p.tag === f)
 
-const newSession = (f: string, wrongIds: Set<string>): Session => ({
+const newSession = (f: string, noteIds: Set<string>, lookup: Map<string, Problem>): Session => ({
   filter: f,
-  ids: shuffle(problemsFor(f, wrongIds)).map((p) => p.id),
+  ids: shuffle(problemsFor(f, noteIds, lookup)).map((p) => p.id),
   index: 0,
   newest: NEWEST,
 })
 
 /** 保存しておいたセッションを今の問題に合わせる（新しいドリルが届いていたら、そのドリルから始める） */
-function restore(saved: Session | null): Session {
-  if (!saved || saved.newest !== NEWEST) return newSession(NEWEST, new Set())
-  if (saved.ids.every((id) => BY_ID.has(id))) return saved
+function restore(saved: Session | null, lookup: Map<string, Problem>): Session {
+  if (!saved || saved.newest !== NEWEST) return newSession(NEWEST, new Set(), lookup)
+  if (saved.filter === '間違えた問題') saved = { ...saved, filter: REVIEW } // 以前の名前
+  if (saved.ids.every((id) => lookup.has(id))) return saved
   // 消えた問題（MD が消えた・書き換わった）は飛ばす
-  const done = saved.ids.slice(0, saved.index).filter((id) => BY_ID.has(id)).length
-  const ids = saved.ids.filter((id) => BY_ID.has(id))
+  const done = saved.ids.slice(0, saved.index).filter((id) => lookup.has(id)).length
+  const ids = saved.ids.filter((id) => lookup.has(id))
   return { ...saved, ids, index: done }
 }
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('practice')
   const [logs, setLogs] = useLocalStorage<AnswerLog[]>('sakubun.drill.logs', [])
+  // 苦手ノートの問題のコピーと、成績表のためのドリルの情報
+  const [snapshots, setSnapshots] = useLocalStorage<Snapshot[]>('sakubun.snapshots', [])
+  const [drillMeta, setDrillMeta] = useLocalStorage<DrillMeta[]>('sakubun.drillMeta', [])
+  const lookup = useMemo(
+    () => new Map<string, Problem>([...snapshots.map((x) => [x.id, x.problem] as const), ...FILE_PROBLEMS]),
+    [snapshots],
+  )
+  const status = useMemo(() => notebook(logs), [logs])
+  const noteIds = new Set([...status].filter(([id, s]) => !s.graduated && lookup.has(id)).map(([id]) => id))
+  // 出しているドリルの情報と、苦手ノートに入った問題の中身を覚えておく（ドリルのファイルが消えても残るように）
+  useEffect(() => {
+    const known = new Set(drillMeta.map((m) => m.name))
+    const add = DRILLS.filter((d) => !known.has(d.name)).map(metaOf)
+    if (add.length) setDrillMeta((prev) => [...prev, ...add])
+  }, [drillMeta, setDrillMeta])
+  useEffect(() => {
+    const saved = new Set(snapshots.map((x) => x.id))
+    const add = [...status.keys()]
+      .filter((id) => !saved.has(id) && FILE_PROBLEMS.has(id))
+      .map((id) => ({ id, at: new Date().toISOString(), problem: FILE_PROBLEMS.get(id)! }))
+    if (add.length) setSnapshots((prev) => [...prev, ...add])
+  }, [status, snapshots, setSnapshots])
+
   const [savedSession, setSession] = useLocalStorage<Session | null>('sakubun.drill.session', null)
-  const session = useMemo(() => restore(savedSession), [savedSession])
+  const session = useMemo(() => restore(savedSession, lookup), [savedSession, lookup])
   // 初めて開いたときや新しいドリルが届いたときに作ったセッションを保存する
   useEffect(() => {
     if (session !== savedSession) setSession(session)
@@ -89,6 +120,7 @@ export default function App() {
     position: string
     combo: number
     newBest: boolean
+    badge?: string
   } | null>(null)
   const [goal, setGoal] = useLocalStorage('sakubun.goal', 10)
   // ごほうび貯金: 使ったお金・ボーナスの記録、登録したごほうび、PROGOS の結果
@@ -111,7 +143,7 @@ export default function App() {
       window.removeEventListener('online', onOnline)
     }
   }, [])
-  const syncedData = JSON.stringify([logs.length, entries, rewards, progos, goal, bestCombo])
+  const syncedData = JSON.stringify([logs.length, entries, rewards, progos, goal, bestCombo, snapshots.length, drillMeta.length])
   const firstData = useRef(syncedData)
   useEffect(() => {
     if (syncedData !== firstData.current) scheduleSync()
@@ -122,17 +154,13 @@ export default function App() {
   // 同じ問題が続けて出たときも Practice を作り直すための番号
   const [round, setRound] = useState(0)
 
-  const latest = new Map<string, boolean>()
-  for (const l of logs) latest.set(l.problemId, l.correct)
-  const wrongIds = new Set([...latest].filter(([id, ok]) => !ok && BY_ID.has(id)).map(([id]) => id))
-
   const start = (f: string) => {
-    setSession(newSession(f, wrongIds))
+    setSession(newSession(f, noteIds, lookup))
     setReviewing(null)
     setRound((r) => r + 1)
   }
 
-  const queue = session.ids.map((id) => BY_ID.get(id)!)
+  const queue = session.ids.map((id) => lookup.get(id)!)
   const current = queue[session.index]
   const endless = session.endlessFrom !== undefined && session.index >= session.endlessFrom
   const position = endless
@@ -145,7 +173,7 @@ export default function App() {
     if (!current && !reviewing && PROBLEMS.length > 0) {
       setSession({
         ...session,
-        ids: [...session.ids, ...nextBatch(session, logs, wrongIds)],
+        ids: [...session.ids, ...nextBatch(session, logs, noteIds, lookup)],
         endlessFrom: session.endlessFrom ?? session.ids.length,
       })
     }
@@ -179,8 +207,14 @@ export default function App() {
       window.clearTimeout(celebrateTimer.current)
       celebrateTimer.current = window.setTimeout(() => setCelebrate(false), 3500)
     }
+    // 苦手ノートの出入り
+    const note = status.get(problem.id)
+    let badge: string | undefined
+    if (!correct) badge = note && !note.graduated ? '📒 苦手ノート：連続正解が 0 に戻りました' : `📒 苦手ノートに入りました（${GRADUATE}回続けて正解すると卒業）`
+    else if (note && !note.graduated)
+      badge = note.streak + 1 >= GRADUATE ? '🎓 卒業！苦手ノートから外れました' : `📒 苦手ノート：あと${GRADUATE - note.streak - 1}回続けて正解で卒業`
     // 答え合わせした時点で解いたことにする（結果は「次へ」を押すまで表示したまま）
-    setReviewing({ problem, position, combo: nextCombo, newBest })
+    setReviewing({ problem, position, combo: nextCombo, newBest, badge })
     setSession({ ...session, index: session.index + 1 })
   }
 
@@ -243,8 +277,10 @@ export default function App() {
         />
       ) : tab === 'stats' ? (
         <Stats
-          problems={PROBLEMS}
           logs={logs}
+          drillMeta={drillMeta}
+          status={status}
+          lookup={lookup}
           onReset={() => setLogs([])}
           goal={goal}
           onGoalChange={setGoal}
@@ -260,18 +296,18 @@ export default function App() {
                 </option>
               ))}
               <option value={ALL}>すべてのドリル（{PROBLEMS.length}）</option>
-              <option value={REVIEW} disabled={wrongIds.size === 0 && session.filter !== REVIEW}>
-                {REVIEW}（{wrongIds.size}）
+              <option value={REVIEW} disabled={noteIds.size === 0 && session.filter !== REVIEW}>
+                {REVIEW}（{noteIds.size}）
               </option>
             </select>
             {endless ? (
-              <p className="muted small review-note">選んだ問題はひと通り解きました。ここからは、間違えた問題やしばらく解いていない問題が続きます。</p>
+              <p className="muted small review-note">選んだ問題はひと通り解きました。ここからは、苦手ノートの問題やしばらく解いていない問題が続きます。</p>
             ) : session.filter === REVIEW ? (
-              <p className="muted small review-note">間違えた問題の復習中。正解するとその問題は復習リストから外れます。</p>
+              <p className="muted small review-note">苦手ノートの復習中。{GRADUATE}回続けて正解すると卒業します。</p>
             ) : (
-              wrongIds.size > 0 && (
+              noteIds.size > 0 && (
                 <button className="review-btn" onClick={() => start(REVIEW)}>
-                  間違えた問題だけ復習する（{wrongIds.size}問）
+                  📒 苦手ノートを復習する（{noteIds.size}問）
                 </button>
               )
             )}
@@ -286,6 +322,7 @@ export default function App() {
               onNext={next}
               combo={reviewing ? shown.combo : 0}
               newBest={reviewing ? shown.newBest : false}
+              badge={reviewing ? shown.badge : undefined}
             />
           ) : (
             <div className="done">

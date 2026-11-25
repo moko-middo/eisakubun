@@ -4,9 +4,15 @@ import { parseDrill } from '../lib/drill'
 /** content/drills/*.md をビルド時に取り込む（新しい日付が先頭）。和訳がなく問題が作れないものは出さない */
 const files = import.meta.glob<string>('/content/drills/*.md', { query: '?raw', import: 'default', eager: true })
 
-export const DRILLS: Drill[] = Object.entries(files)
+const ALL_DRILLS: Drill[] = Object.entries(files)
   .map(([path, md]) => parseDrill(path.split('/').pop()!.replace(/\.md$/, ''), md))
   .filter((d) => d.problems.length > 0)
   .sort((a, b) => b.name.localeCompare(a.name))
 
+/** アプリに出すドリルの数（新しいものから）。古いドリルの結果は成績表に、間違えた問題は苦手ノートに残る */
+export const ACTIVE_DRILLS = 3
+
+export const DRILLS = ALL_DRILLS.slice(0, ACTIVE_DRILLS)
 export const PROBLEMS = DRILLS.flatMap((d) => d.problems)
+/** まだファイルが残っている問題すべて（出題しないドリルの分も、苦手ノート・記録のために引けるように） */
+export const ALL_PROBLEMS = ALL_DRILLS.flatMap((d) => d.problems)
