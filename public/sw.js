@@ -1,6 +1,6 @@
 // オフラインでも開けるようにするサービスワーカー。
 // ページ本体は「ネット優先」（新しいドリルをすぐ反映）、ファイル名にハッシュが付いた JS / CSS などは「保存したものを優先」
-const CACHE = 'sakubun-v1'
+const CACHE = 'sakubun-v2'
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (e) => {
@@ -16,8 +16,9 @@ self.addEventListener('fetch', (e) => {
   const req = e.request
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return
   if (req.mode === 'navigate') {
+    // ページ本体はブラウザの HTTP キャッシュ（GitHub Pages は 10 分）も使わず、いつも最新を取りにいく
     e.respondWith(
-      fetch(req)
+      fetch(req.url, { cache: 'no-store', credentials: 'same-origin' })
         .then((res) => {
           const copy = res.clone()
           caches.open(CACHE).then((c) => c.put(req, copy))

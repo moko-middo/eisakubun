@@ -10,6 +10,7 @@ import { Confetti } from './components/Confetti'
 import { Practice } from './components/Practice'
 import { Stats } from './components/Stats'
 import { useSyncConfig } from './components/SyncSettings'
+import { useNewVersion } from './hooks/useNewVersion'
 import { scheduleSync, syncNow } from './lib/sync'
 import { Rewards, type Progos } from './components/Rewards'
 import { earnings, LEVELS, progosBonus, PROGOS_PRICE, yen, type Entry, type Level, type Reward } from './lib/wallet'
@@ -75,6 +76,7 @@ const newSession = (f: string, noteIds: Set<string>, lookup: Map<string, Problem
 function restore(saved: Session | null, lookup: Map<string, Problem>): Session {
   if (!saved || saved.newest !== NEWEST) return newSession(NEWEST, new Set(), lookup)
   if (saved.filter === '間違えた問題') saved = { ...saved, filter: REVIEW } // 以前の名前
+  if (saved.filter === ALL) saved = { ...saved, filter: NEWEST } // 「すべてのドリル」はなくした
   if (saved.ids.every((id) => lookup.has(id))) return saved
   // 消えた問題（MD が消えた・書き換わった）は飛ばす
   const done = saved.ids.slice(0, saved.index).filter((id) => lookup.has(id)).length
@@ -130,6 +132,7 @@ export default function App() {
   const [sound, setSound] = useLocalStorage('sakubun.sound', true)
   const [bestCombo, setBestCombo] = useLocalStorage('sakubun.bestCombo', 0)
   const sync = useSyncConfig()
+  const updateReady = useNewVersion()
 
   // GitHub との同期: 開いたとき・電波が戻ったとき・アプリを離れたときにすぐ、記録が変わったら少し待ってから
   useEffect(() => {
@@ -237,6 +240,11 @@ export default function App() {
         <DailyBar daily={today} sound={sound} onToggleSound={() => setSound(!sound)} />
       </header>
       {celebrate && <Confetti streak={today.streak} earned={todayEarned} />}
+      {updateReady && (
+        <button className="update-banner" onClick={() => location.reload()}>
+          ✨ 新しいドリルが届きました。タップして更新
+        </button>
+      )}
       {sync?.error && (
         <button className="sync-warning" onClick={() => switchTab('stats')}>
           ⚠️ GitHub と同期できていません（記録タブで確認）
@@ -295,7 +303,6 @@ export default function App() {
                   {d.label}（{d.problems.length}）
                 </option>
               ))}
-              <option value={ALL}>すべてのドリル（{PROBLEMS.length}）</option>
               <option value={REVIEW} disabled={noteIds.size === 0 && session.filter !== REVIEW}>
                 {REVIEW}（{noteIds.size}）
               </option>
