@@ -1,5 +1,6 @@
 import type { AnswerLog, Problem } from '../types'
 import { Backup } from './Backup'
+import { SyncSettings } from './SyncSettings'
 
 interface Props {
   problems: Problem[]
@@ -84,6 +85,8 @@ export function Stats({ problems, logs, onReset, goal, onGoalChange, bestCombo, 
         ))}
       </ul>
       <p className="muted small">「クリア」は最後に解いたとき正解だった問題の数です。</p>
+
+      <SyncSettings />
 
       <Backup lastBackup={lastBackup} onSaved={onBackupSaved} />
 

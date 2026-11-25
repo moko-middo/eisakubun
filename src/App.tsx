@@ -9,6 +9,8 @@ import { Confetti } from './components/Confetti'
 import { Practice } from './components/Practice'
 import { Stats } from './components/Stats'
 import { BackupBanner } from './components/Backup'
+import { useSyncConfig } from './components/SyncSettings'
+import { scheduleSync, syncNow } from './lib/sync'
 import { Rewards, type Progos } from './components/Rewards'
 import { earnings, LEVELS, progosBonus, PROGOS_PRICE, yen, type Entry, type Level, type Reward } from './lib/wallet'
 
@@ -99,6 +101,25 @@ export default function App() {
   // バックアップ: 最後に保存した日と、「あとで」を押した日（その日はもうお知らせを出さない）
   const [lastBackup, setLastBackup] = useLocalStorage<string | null>('sakubun.lastBackup', null)
   const [backupLater, setBackupLater] = useLocalStorage<string | null>('sakubun.backupLater', null)
+  const sync = useSyncConfig()
+
+  // GitHub との同期: 開いたとき・電波が戻ったとき・アプリを離れたときにすぐ、記録が変わったら少し待ってから
+  useEffect(() => {
+    void syncNow()
+    const onHide = () => document.visibilityState === 'hidden' && void syncNow()
+    const onOnline = () => void syncNow()
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('online', onOnline)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [])
+  const syncedData = JSON.stringify([logs.length, entries, rewards, progos, goal, bestCombo])
+  const firstData = useRef(syncedData)
+  useEffect(() => {
+    if (syncedData !== firstData.current) scheduleSync()
+  }, [syncedData])
   const [combo, setCombo] = useState(0)
   const [celebrate, setCelebrate] = useState(false)
   const celebrateTimer = useRef<number>(undefined)
@@ -186,7 +207,12 @@ export default function App() {
         <DailyBar daily={today} sound={sound} onToggleSound={() => setSound(!sound)} />
       </header>
       {celebrate && <Confetti streak={today.streak} earned={todayEarned} />}
-      {logs.length > 0 && lastBackup !== localDate(new Date()) && backupLater !== localDate(new Date()) && (
+      {sync?.error && (
+        <button className="sync-warning" onClick={() => switchTab('stats')}>
+          ⚠️ GitHub と同期できていません（記録タブで確認）
+        </button>
+      )}
+      {!sync && logs.length > 0 && lastBackup !== localDate(new Date()) && backupLater !== localDate(new Date()) && (
         <BackupBanner
           onSaved={() => setLastBackup(localDate(new Date()))}
           onLater={() => setBackupLater(localDate(new Date()))}
