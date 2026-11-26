@@ -48,9 +48,13 @@ function nextBatch(session: Session, logs: AnswerLog[], noteIds: Set<string>, lo
   const lastSeen = new Map<string, number>()
   for (const l of logs) lastSeen.set(l.problemId, Date.parse(l.at))
   const recent = new Set(session.ids.slice(-BATCH))
-  const all = [...new Map([...PROBLEMS, ...[...noteIds].map((id) => lookup.get(id)!)].map((p) => [p.id, p])).values()]
-  const pool = all.filter((p) => !recent.has(p.id))
-  if (pool.length === 0) return shuffle(all).map((p) => p.id)
+  // 出してよいのは、まだ解いていない問題と苦手ノートの問題だけ（正解した問題・卒業した問題は二度と出さない）
+  const all = [...new Map([...PROBLEMS, ...[...noteIds].map((id) => lookup.get(id)!)].map((p) => [p.id, p])).values()].filter(
+    (p) => !lastSeen.has(p.id) || noteIds.has(p.id),
+  )
+  let pool = all.filter((p) => !recent.has(p.id))
+  // 残りが少し前に出した苦手ノートの問題だけのときは、それをもう一度出す（卒業するまで）
+  if (pool.length === 0) pool = all
   const rank = (p: Problem) => (noteIds.has(p.id) ? 0 : lastSeen.has(p.id) ? 2 : 1)
   const ordered = shuffle(pool).sort(
     (a, b) => rank(a) - rank(b) || (rank(a) === 2 ? lastSeen.get(a.id)! - lastSeen.get(b.id)! : 0),
@@ -58,23 +62,23 @@ function nextBatch(session: Session, logs: AnswerLog[], noteIds: Set<string>, lo
   return shuffle(ordered.slice(0, BATCH)).map((p) => p.id)
 }
 
-const problemsFor = (f: string, noteIds: Set<string>, lookup: Map<string, Problem>) =>
-  f === ALL
-    ? PROBLEMS
-    : f === REVIEW
-      ? [...noteIds].map((id) => lookup.get(id)!)
-      : PROBLEMS.filter((p) => p.tag === f)
+/** まだ解いていない問題か、苦手ノートに入っている問題か（そうでなければもう出さない） */
+const eligible = (id: string, answered: Set<string>, noteIds: Set<string>) => !answered.has(id) || noteIds.has(id)
 
-const newSession = (f: string, noteIds: Set<string>, lookup: Map<string, Problem>): Session => ({
+const problemsFor = (f: string, noteIds: Set<string>, lookup: Map<string, Problem>, answered: Set<string> = new Set()) =>
+  f === REVIEW
+    ? [...noteIds].map((id) => lookup.get(id)!)
+    : PROBLEMS.filter((p) => (f === ALL || p.tag === f) && eligible(p.id, answered, noteIds))
+
+const newSession = (f: string, noteIds: Set<string>, lookup: Map<string, Problem>, answered?: Set<string>): Session => ({
   filter: f,
-  ids: shuffle(problemsFor(f, noteIds, lookup)).map((p) => p.id),
+  ids: shuffle(problemsFor(f, noteIds, lookup, answered)).map((p) => p.id),
   index: 0,
   newest: NEWEST,
 })
 
 /** 保存しておいたセッションを今の問題に合わせる（新しいドリルが届いていたら、そのドリルから始める） */
-function restore(saved: Session | null, lookup: Map<string, Problem>): Session {
-  if (!saved || saved.newest !== NEWEST) return newSession(NEWEST, new Set(), lookup)
+function restore(saved: Session, lookup: Map<string, Problem>): Session {
   if (saved.filter === '間違えた問題') saved = { ...saved, filter: REVIEW } // 以前の名前
   if (saved.filter === ALL) saved = { ...saved, filter: NEWEST } // 「すべてのドリル」はなくした
   if (saved.ids.every((id) => lookup.has(id))) return saved
@@ -111,7 +115,19 @@ export default function App() {
   }, [status, snapshots, setSnapshots])
 
   const [savedSession, setSession] = useLocalStorage<Session | null>('sakubun.drill.session', null)
-  const session = useMemo(() => restore(savedSession, lookup), [savedSession, lookup])
+  const answeredIds = useMemo(() => new Set(logs.map((l) => l.problemId)), [logs])
+  // 初めて開いたときや新しいドリルが届いたときは、一番新しいドリルのまだ解いていない問題から始める。
+  // 作った順番は保存されるまで同じものを使う（描き直すたびに並べ直さないように）
+  const fresh = useRef<Session | null>(null)
+  const session = useMemo(() => {
+    if (!savedSession || savedSession.newest !== NEWEST) {
+      fresh.current ??= newSession(NEWEST, noteIds, lookup, answeredIds)
+      return fresh.current
+    }
+    return restore(savedSession, lookup)
+    // noteIds・answeredIds は最初のセッションを作るときだけ使う
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedSession, lookup])
   // 初めて開いたときや新しいドリルが届いたときに作ったセッションを保存する
   useEffect(() => {
     if (session !== savedSession) setSession(session)
@@ -157,8 +173,10 @@ export default function App() {
   // 同じ問題が続けて出たときも Practice を作り直すための番号
   const [round, setRound] = useState(0)
 
+  const remaining = (tag: string) => PROBLEMS.filter((p) => p.tag === tag && eligible(p.id, answeredIds, noteIds)).length
+
   const start = (f: string) => {
-    setSession(newSession(f, noteIds, lookup))
+    setSession(newSession(f, noteIds, lookup, answeredIds))
     setReviewing(null)
     setRound((r) => r + 1)
   }
@@ -171,14 +189,19 @@ export default function App() {
     : `${session.index + 1} / ${session.endlessFrom ?? queue.length}`
   const shown = reviewing ?? (current && { problem: current, position, combo: 0, newBest: false })
 
-  // 選んだ範囲を解き終えたら、おすすめの問題を足して続ける
+  // 選んだ範囲を解き終えたら、おすすめの問題を足して続ける（もう出せる問題がなければ「全部正解」）
+  const allDone = !current && !reviewing && nextBatch(session, logs, noteIds, lookup).length === 0
   useEffect(() => {
-    if (!current && !reviewing && PROBLEMS.length > 0) {
-      setSession({
-        ...session,
-        ids: [...session.ids, ...nextBatch(session, logs, noteIds, lookup)],
-        endlessFrom: session.endlessFrom ?? session.ids.length,
-      })
+    if (reviewing) return
+    // ほかの端末で正解した問題などは飛ばす
+    if (current && !eligible(current.id, answeredIds, noteIds)) {
+      setSession({ ...session, index: session.index + 1 })
+      return
+    }
+    if (!current && PROBLEMS.length > 0) {
+      const batch = nextBatch(session, logs, noteIds, lookup)
+      if (batch.length)
+        setSession({ ...session, ids: [...session.ids, ...batch], endlessFrom: session.endlessFrom ?? session.ids.length })
     }
   })
 
@@ -300,7 +323,7 @@ export default function App() {
             <select value={session.filter} onChange={(e) => start(e.target.value)} aria-label="出題範囲">
               {DRILLS.map((d) => (
                 <option key={d.name} value={d.label}>
-                  {d.label}（{d.problems.length}）
+                  {d.label}（残り {remaining(d.label)} / {d.problems.length}）
                 </option>
               ))}
               <option value={REVIEW} disabled={noteIds.size === 0 && session.filter !== REVIEW}>
@@ -336,7 +359,9 @@ export default function App() {
               <p>
                 {PROBLEMS.length === 0
                   ? 'まだドリルがありません。content/drills/ に MD ファイルが入ると、ここに問題が出ます。'
-                  : '読み込み中…'}
+                  : allDone
+                    ? '🎉 今あるドリルは全部正解しました！新しいドリルが届くのを待ちましょう。'
+                    : '読み込み中…'}
               </p>
             </div>
           )}
