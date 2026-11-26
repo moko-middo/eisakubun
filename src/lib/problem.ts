@@ -66,6 +66,15 @@ const CLAUSE = new Set(
 )
 /** 文と文をつなぐ語。文頭の語句は、この前（前半の文の終わり）に移してもよい */
 const JOIN = new Set(['and', 'but', 'so', 'or'])
+/** 時を表す語句か（every Sunday morning / at exactly nine o'clock / last night / on Thursday など） */
+const TIME_START = new Set('every last next this yesterday today tonight tomorrow'.split(' '))
+const TIME_WORD =
+  /^(?:\d+|o'clock|morning|afternoon|evening|night|noon|midnight|weekend|week|month|year|day|half|quarter|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|christmas|easter|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)$/
+function isTime(phrase: Token[]) {
+  const ws = words(phrase)
+  return TIME_START.has(ws[0]) || (['at', 'on', 'in', 'during'].includes(ws[0]) && ws.slice(1).some((w) => TIME_WORD.test(w)))
+}
+
 /** 「, so」「, but」のように、読点のあとで次の文を始める語 */
 const SPLIT = new Set([...JOIN, 'because', 'although', 'though', 'while', 'when', 'if', 'unless', 'until', 'before', 'after'])
 /** 直後の語句と結びついている語（almost every morning など） */
@@ -112,6 +121,36 @@ export function otherOrders(tokens: Token[]): Token[][] {
       if (words(rest).some((w) => CLAUSE.has(w))) continue
       if (BOUND.has(words(rest)[words(rest).length - 1])) continue
       out.push([...tokens.slice(0, lead), ...chunk, ...rest, ...tokens.slice(e)])
+    }
+    // 文の最後に時・場所の語句が 2 つ続くとき（… every Sunday morning at exactly nine o'clock）は、
+    // 2 つの順番を入れ替えても、どちらか（または両方）を文の頭に出してもよい
+    // ただし、どちらも「時」を表す語句のときだけ（in ink や on a breadstick のように動詞と結びついた語句は動かさない）
+    const isPhrase = (from: number, to: number) =>
+      to - from <= 5 &&
+      MOVABLE.has(firstWord(tokens[from])) &&
+      !tokens.slice(from + 1, to).some((t) => MOVABLE.has(firstWord(t))) &&
+      isTime(tokens.slice(from, to))
+    for (let k2 = e - 1; k2 >= Math.max(lead + 3, e - 5); k2--) {
+      if (!isPhrase(k2, e)) continue
+      for (let k1 = k2 - 1; k1 >= Math.max(lead + 2, k2 - 5); k1--) {
+        if (!isPhrase(k1, k2)) continue
+        const rest = tokens.slice(lead, k1)
+        if (rest.some((t) => /[,.?!;:]$/.test(t.display))) break
+        if (words(rest).some((w) => CLAUSE.has(w)) || BOUND.has(words(rest)[words(rest).length - 1])) break
+        const a = tokens.slice(k1, k2)
+        const b = tokens.slice(k2, e)
+        const head = tokens.slice(0, lead)
+        const tail = tokens.slice(e)
+        for (const order of [
+          [...rest, ...b, ...a],
+          [...b, ...rest, ...a],
+          [...a, ...rest, ...b],
+          [...a, ...b, ...rest],
+          [...b, ...a, ...rest],
+        ])
+          out.push([...head, ...order, ...tail])
+        break
+      }
     }
   })
   return out
