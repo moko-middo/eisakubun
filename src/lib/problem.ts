@@ -66,6 +66,8 @@ const CLAUSE = new Set(
 )
 /** 文と文をつなぐ語。文頭の語句は、この前（前半の文の終わり）に移してもよい */
 const JOIN = new Set(['and', 'but', 'so', 'or'])
+/** 「, so」「, but」のように、読点のあとで次の文を始める語 */
+const SPLIT = new Set([...JOIN, 'because', 'although', 'though', 'while', 'when', 'if', 'unless', 'until', 'before', 'after'])
 /** 直後の語句と結びついている語（almost every morning など） */
 const BOUND = new Set('almost nearly only just about around roughly even'.split(' '))
 
@@ -76,9 +78,9 @@ const words = (ts: Token[]) => ts.flatMap((t) => normalize(t.prefix ? `${t.prefi
  * 模範解答のほかに正解にする語順。
  * - 文頭の「On Boxing Day,」のような語句を文末、または and / but の前に回したもの
  * - 文末の「at the Christmas market」のような短い語句（5 語まで）を文頭に出したもの。
- *   ただし、節が 1 つだけの文に限る（2 つ以上あると、どこに掛かる語句か変わってしまうため）
+ *   「, so」「, but」などでつながった文では、それぞれの文の中でだけ動かす（文をまたぐと意味が変わるため）
  */
-function otherOrders(tokens: Token[]): Token[][] {
+export function otherOrders(tokens: Token[]): Token[][] {
   const n = tokens.length
   const out: Token[][] = []
   if (MOVABLE.has(firstWord(tokens[0]))) {
@@ -95,16 +97,23 @@ function otherOrders(tokens: Token[]): Token[][] {
       }
     }
   }
-  for (let k = n - 1; k >= Math.max(2, n - 5); k--) {
-    const chunk = tokens.slice(k)
-    const rest = tokens.slice(0, k)
-    if (!MOVABLE.has(firstWord(tokens[k]))) continue
-    if (chunk.slice(1).some((t) => MOVABLE.has(firstWord(t)))) continue // around cups of … at the market のようにまとまりが切れる
-    if (rest.some((t) => /[,.?!;:]$/.test(t.display))) continue // 文が 2 つ以上・読点がある
-    if (words(rest).some((w) => CLAUSE.has(w))) continue
-    if (BOUND.has(words(rest)[words(rest).length - 1])) continue
-    out.push([...chunk, ...rest])
-  }
+  // 「…, so …」「…, but …」のように 2 つの文がつながっているときは、それぞれの文の中で考える
+  const starts = [0]
+  for (let i = 1; i < n; i++) if (/,$/.test(tokens[i - 1].display) && SPLIT.has(firstWord(tokens[i]))) starts.push(i)
+  starts.forEach((s, si) => {
+    const e = starts[si + 1] ?? n
+    const lead = s > 0 ? s + 1 : 0 // 後ろの文の先頭の so / but などは動かさない
+    for (let k = e - 1; k >= Math.max(lead + 2, e - 5); k--) {
+      const chunk = tokens.slice(k, e)
+      const rest = tokens.slice(lead, k)
+      if (!MOVABLE.has(firstWord(tokens[k]))) continue
+      if (chunk.slice(1).some((t) => MOVABLE.has(firstWord(t)))) continue // around cups of … at the market のようにまとまりが切れる
+      if (rest.some((t) => /[,.?!;:]$/.test(t.display))) continue // 文がさらに分かれている・読点がある
+      if (words(rest).some((w) => CLAUSE.has(w))) continue
+      if (BOUND.has(words(rest)[words(rest).length - 1])) continue
+      out.push([...tokens.slice(0, lead), ...chunk, ...rest, ...tokens.slice(e)])
+    }
+  })
   return out
 }
 
